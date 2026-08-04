@@ -5,7 +5,11 @@ import type { definitions } from "./api/types";
 import Login from "./pages/Login";
 import Bootstrap from "./pages/Bootstrap";
 import Dashboard from "./pages/Dashboard";
-
+import Devices from "./pages/Devices";
+import DeviceDetail from "./pages/DeviceDetail";
+import Account from "./pages/Account";
+import Users from "./pages/Users";
+import Quarantine from "./pages/Quarantine";
 type SetupStatusResponse = definitions["SetupStatusResponse"];
 
 export default function App() {
@@ -53,6 +57,26 @@ export default function App() {
           }
         />
         <Route
+          path="/devices"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Devices />
+            ) : (
+              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+            )
+          }
+        />
+        <Route
+          path="/devices/:id"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <DeviceDetail />
+            ) : (
+              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+            )
+          }
+        />
+        <Route
           path="/bootstrap"
           element={setupRequired ? <Bootstrap /> : <Navigate to="/" />}
         />
@@ -65,6 +89,36 @@ export default function App() {
         <Route
           path="/dashboard"
           element={isAuthenticated ? <Dashboard /> : <Navigate to="/" />}
+        />
+        <Route
+          path="/account"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Account />
+            ) : (
+              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+            )
+          }
+        />
+        <Route
+          path="/users"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Users />
+            ) : (
+              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+            )
+          }
+        />
+        <Route
+          path="/quarantine"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Quarantine />
+            ) : (
+              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+            )
+          }
         />
       </Routes>
     </BrowserRouter>
