@@ -17,6 +17,7 @@ import {
   ShieldBan,
   Clock,
   Network,
+  User as UserIcon,
 } from "lucide-react";
 import {
   PieChart,
@@ -28,6 +29,7 @@ import {
 } from "recharts";
 import { api } from "../api/client";
 import type { definitions } from "../api/types";
+import { Link } from "react-router-dom";
 
 type SystemStatus = definitions["SystemStatus"];
 type Alert = definitions["Alert"];
@@ -149,36 +151,50 @@ export default function Dashboard() {
         </div>
 
         <nav className="p-2 space-y-0.5 flex-1 text-sm">
-          <a
-            href="/"
+          <Link
+            to="/"
             className="flex items-center gap-3 px-4 py-2.5 bg-blue-600 text-white rounded font-medium"
           >
             <Home className="w-4 h-4" /> Przegląd
-          </a>
-          <a
-            href="/quarantine"
+          </Link>
+          <Link
+            to="/vlans"
+            className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
+          >
+            <Network className="w-4 h-4" /> Segmenty Sieci
+          </Link>
+          <Link
+            to="/quarantine"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <ShieldBan className="w-4 h-4" /> Kwarantanna
-          </a>
-          <a
-            href="/devices"
+          </Link>
+          <Link
+            to="/devices"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Wifi className="w-4 h-4" /> Urządzenia
-          </a>
-          <a
-            href="/users"
+          </Link>
+          <Link
+            to="/users"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Users className="w-4 h-4" /> Użytkownicy
-          </a>
-          <a
-            href="/settings"
-            className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
-          >
-            <Settings className="w-4 h-4" /> Ustawienia
-          </a>
+          </Link>
+          <div className="pt-4 mt-2 border-t border-gray-700/50">
+            <Link
+              to="/account"
+              className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
+            >
+              <UserIcon className="w-4 h-4" /> Moje Konto
+            </Link>
+            <Link
+              to="/settings"
+              className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
+            >
+              <Settings className="w-4 h-4" /> Ustawienia Systemu
+            </Link>
+          </div>
         </nav>
       </aside>
 
@@ -223,7 +239,10 @@ export default function Dashboard() {
 
         <main className="flex-1 p-4 md:p-4 overflow-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4 text-white">
-            <div className="bg-[#2a8bf2] p-4 rounded shadow-sm flex flex-col justify-between">
+            <Link
+              to="/devices"
+              className="bg-[#2a8bf2] p-4 rounded shadow-sm flex flex-col justify-between hover:opacity-90 transition-opacity cursor-pointer"
+            >
               <div className="flex items-center justify-between mb-2 opacity-90">
                 <span className="text-sm font-medium uppercase tracking-wider">
                   Aktywne Urządzenia
@@ -236,10 +255,11 @@ export default function Dashboard() {
                   / {status?.counts?.devices || 0} total
                 </span>
               </div>
-            </div>
+            </Link>
 
-            <div
-              className={`p-4 rounded shadow-sm flex flex-col justify-between ${quarantined > 0 ? "bg-[#e53935]" : "bg-[#43a047]"}`}
+            <Link
+              to="/quarantine"
+              className={`p-4 rounded shadow-sm flex flex-col justify-between hover:opacity-90 transition-opacity cursor-pointer ${quarantined > 0 ? "bg-[#e53935]" : "bg-[#43a047]"}`}
             >
               <div className="flex items-center justify-between mb-2 opacity-90">
                 <span className="text-sm font-medium uppercase tracking-wider">
@@ -250,7 +270,7 @@ export default function Dashboard() {
               <div className="text-3xl font-bold">
                 {statusLoading ? "..." : quarantined}
               </div>
-            </div>
+            </Link>
 
             <div
               className={`p-4 rounded shadow-sm flex flex-col justify-between ${status?.counts?.unacknowledged_alerts ? "bg-[#fb8c00]" : "bg-[#43a047]"}`}
@@ -303,9 +323,12 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              <button className="bg-orange-50 hover:bg-orange-100 text-orange-700 px-4 py-1.5 rounded text-sm font-medium transition-colors dark:bg-orange-900/30 dark:text-orange-400">
+              <Link
+                to="/quarantine"
+                className="bg-orange-50 hover:bg-orange-100 text-orange-700 px-4 py-1.5 rounded text-sm font-medium transition-colors dark:bg-orange-900/30 dark:text-orange-400"
+              >
                 Rozwiąż
-              </button>
+              </Link>
             </div>
           )}
 
@@ -317,9 +340,10 @@ export default function Dashboard() {
               {vlansData?.data?.map((vlan) => {
                 const isNotDeployed = vlan.vid === 99 || !vlan.is_deployed;
                 return (
-                  <div
+                  <Link
+                    to="/vlans"
                     key={vlan.vid}
-                    className={`p-2 border rounded flex flex-col justify-between ${isNotDeployed ? "bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700 opacity-60" : "bg-white border-blue-200 border-l-4 border-l-blue-500 dark:bg-gray-900 dark:border-gray-700 dark:border-l-blue-500"}`}
+                    className={`p-2 border rounded flex flex-col justify-between cursor-pointer hover:shadow-md transition-shadow ${isNotDeployed ? "bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700 opacity-60 hover:opacity-80" : "bg-white border-blue-200 border-l-4 border-l-blue-500 dark:bg-gray-900 dark:border-gray-700 dark:border-l-blue-500 hover:border-blue-400 dark:hover:border-l-blue-400"}`}
                   >
                     <div className="flex justify-between items-start mb-1">
                       <span
@@ -339,7 +363,7 @@ export default function Dashboard() {
                     >
                       {vlan.display_name || vlan.name}
                     </span>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

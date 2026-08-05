@@ -29,6 +29,7 @@ export default function Bootstrap() {
   });
 
   const [setupError, setSetupError] = useState("");
+  const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
     setPasswordReqs({
@@ -51,13 +52,37 @@ export default function Bootstrap() {
     passwordReqs.match;
 
   const setupMutation = useMutation({
-    mutationFn: (payload: any) => api.post("/setup/bootstrap", payload),
+    mutationFn: async (payload: any) => {
+      const res = await api.post("/setup/bootstrap", payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      // Pokazujemy sukces i po 1.5 sekundy robimy twarde przeładowanie aplikacji
+      setIsSuccess(true);
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 1500);
+    },
+    onError: (error: any) => {
+      // Jeśli użytkownik zablokował się na tym oknie, a backend już ma zainicjalizowaną bazę,
+      // API zwróci kod 409. Wtedy od razu przekierowujemy na logowanie.
+      if (error?.response?.status === 409) {
+        window.location.href = "/login";
+        return;
+      }
+      setSetupError(
+        error?.response?.data?.error?.message ||
+          "Nieprawidłowy token inicjalizacyjny.",
+      );
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSetupError("");
     if (!isFormValid) return;
+
+    localStorage.removeItem("csrf_token");
 
     const payload = {
       setup_token: formData.setupToken,
@@ -66,25 +91,26 @@ export default function Bootstrap() {
       password: formData.password,
     };
 
-    setupMutation.mutate(payload, {
-      onSuccess: (res) => {
-        const data = res.data;
-        const serverError = data?.error || data?.message;
-
-        if (serverError) {
-          setSetupError(
-            "Nieprawidłowy token inicjalizacyjny lub dane wpisane w formularz.",
-          );
-          return;
-        }
-
-        window.location.href = "/login";
-      },
-      onError: () => {
-        setSetupError("Nieprawidłowy token inicjalizacyjny.");
-      },
-    });
+    setupMutation.mutate(payload);
   };
+
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#1a1d21] flex flex-col justify-center items-center transition-colors duration-200">
+        <div className="animate-in fade-in zoom-in duration-300 flex flex-col items-center">
+          <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-6">
+            <CheckCircle2 className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Konfiguracja zakończona!
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 font-medium">
+            Trwa przekierowywanie do logowania...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#1a1d21] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans transition-colors duration-200">

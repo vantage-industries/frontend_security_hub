@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   Menu,
   X,
@@ -21,19 +21,7 @@ import {
 import { api } from "../api/client";
 import type { definitions } from "../api/types";
 
-type BaseDevice = definitions["Device"];
-type Device = BaseDevice & {
-  id?: string;
-  name?: string;
-  ip_address?: string;
-  mac_address?: string;
-  is_random_mac?: boolean;
-  vendor?: string;
-  vlan_id?: number;
-  is_active?: boolean;
-  classification?: string;
-  last_seen?: string;
-};
+type Device = definitions["Device"];
 type ListResponseDevice =
   definitions["ListResponse-security-hub_internal_dto_Device"];
 
@@ -97,36 +85,36 @@ export default function Devices() {
         </div>
 
         <nav className="p-2 space-y-0.5 flex-1 text-sm">
-          <a
-            href="/"
+          <Link
+            to="/"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Home className="w-4 h-4" /> Przegląd
-          </a>
-          <a
-            href="/quarantine"
+          </Link>
+          <Link
+            to="/quarantine"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <ShieldBan className="w-4 h-4" /> Kwarantanna
-          </a>
-          <a
-            href="/devices"
+          </Link>
+          <Link
+            to="/devices"
             className="flex items-center gap-3 px-4 py-2.5 bg-blue-600 text-white rounded font-medium"
           >
             <Wifi className="w-4 h-4" /> Urządzenia
-          </a>
-          <a
-            href="/users"
+          </Link>
+          <Link
+            to="/users"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Users className="w-4 h-4" /> Użytkownicy
-          </a>
-          <a
-            href="/settings"
+          </Link>
+          <Link
+            to="/settings"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Settings className="w-4 h-4" /> Ustawienia
-          </a>
+          </Link>
         </nav>
       </aside>
 
@@ -157,7 +145,10 @@ export default function Devices() {
             </button>
             <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-2"></div>
             <button
-              onClick={() => {
+              onClick={async () => {
+                try {
+                  await api.post("/auth/logout");
+                } catch (e) {}
                 localStorage.removeItem("csrf_token");
                 window.location.href = "/login";
               }}
@@ -242,9 +233,6 @@ export default function Devices() {
                       Klasyfikacja
                     </th>
                     <th className="px-3 py-2 border-b dark:border-gray-700">
-                      Adres IP
-                    </th>
-                    <th className="px-3 py-2 border-b dark:border-gray-700">
                       Adres MAC
                     </th>
                     <th className="px-3 py-2 border-b dark:border-gray-700">
@@ -256,7 +244,7 @@ export default function Devices() {
                   {isLoading ? (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={7}
                         className="p-8 text-center font-sans text-gray-500"
                       >
                         Ładowanie urządzeń...
@@ -265,15 +253,18 @@ export default function Devices() {
                   ) : devicesData?.data?.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={7}
                         className="p-8 text-center font-sans text-gray-500"
                       >
                         Brak urządzeń.
                       </td>
                     </tr>
                   ) : (
-                    devicesData?.data?.map((deviceRaw: BaseDevice) => {
-                      const device = deviceRaw as Device;
+                    devicesData?.data?.map((device) => {
+                      const macEntry =
+                        device.macs && device.macs.length > 0
+                          ? device.macs[0]
+                          : null;
                       return (
                         <tr
                           key={device.id}
@@ -286,10 +277,14 @@ export default function Devices() {
                             />
                           </td>
                           <td className="px-3 py-2 font-sans font-medium text-gray-800 dark:text-white">
-                            {device.name || "Nienazwany"}
+                            {device.display_name ||
+                              device.model_name ||
+                              "Nienazwany"}
                           </td>
                           <td className="px-3 py-2 font-sans text-gray-500 dark:text-gray-400">
-                            {device.vendor || "Nieznany"}
+                            {device.vendor_name ||
+                              macEntry?.oui_vendor ||
+                              "Nieznany"}
                           </td>
                           <td className="px-3 py-2">
                             <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded text-[10px] font-bold">
@@ -302,11 +297,8 @@ export default function Devices() {
                             </span>
                           </td>
                           <td className="px-3 py-2">
-                            {device.ip_address || "-"}
-                          </td>
-                          <td className="px-3 py-2">
-                            {device.mac_address || "-"}
-                            {device.is_random_mac && (
+                            {macEntry?.mac || "-"}
+                            {macEntry?.is_randomized && (
                               <span className="ml-1 text-[9px] bg-orange-100 text-orange-700 px-1 rounded">
                                 RAND
                               </span>

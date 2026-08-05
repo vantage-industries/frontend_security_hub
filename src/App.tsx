@@ -10,6 +10,11 @@ import DeviceDetail from "./pages/DeviceDetail";
 import Account from "./pages/Account";
 import Users from "./pages/Users";
 import Quarantine from "./pages/Quarantine";
+import Settings from "./pages/Settings";
+import Onboarding from "./pages/Onboarding";
+import Vlans from "./pages/Vlans";
+import Policies from "./pages/Policies";
+
 type SetupStatusResponse = definitions["SetupStatusResponse"];
 
 export default function App() {
@@ -115,6 +120,46 @@ export default function App() {
           element={
             isAuthenticated && !setupRequired ? (
               <Quarantine />
+            ) : (
+              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+            )
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Settings />
+            ) : (
+              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+            )
+          }
+        />
+        <Route
+          path="/onboarding"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Onboarding />
+            ) : (
+              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+            )
+          }
+        />
+        <Route
+          path="/vlans"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Vlans />
+            ) : (
+              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+            )
+          }
+        />
+        <Route
+          path="/policies"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Policies />
             ) : (
               <Navigate to={setupRequired ? "/setup" : "/login"} replace />
             )

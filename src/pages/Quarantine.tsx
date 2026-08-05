@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import {
   Menu,
   X,
@@ -16,17 +17,14 @@ import {
   Search,
   ShieldAlert,
   CheckCircle2,
+  Network,
 } from "lucide-react";
 import { api } from "../api/client";
+import type { definitions } from "../api/types";
 
-type QuarantinedDevice = {
-  id: string;
-  mac_address: string;
-  ip_address?: string;
-  hostname?: string;
-  reason: string;
-  created_at: string;
-};
+type Device = definitions["Device"];
+type ListResponseDevice =
+  definitions["ListResponse-security-hub_internal_dto_Device"];
 
 export default function Quarantine() {
   const queryClient = useQueryClient();
@@ -34,69 +32,156 @@ export default function Quarantine() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [releaseModalData, setReleaseModalData] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [selectedVlan, setSelectedVlan] = useState("10");
+
+  useQuery({
+    queryKey: ["session"],
+    queryFn: async () => {
+      const res =
+        await api.get<definitions["SessionResponse"]>("/auth/session");
+      return res.data;
+    },
+    staleTime: Infinity,
+  });
+
   const { data: quarantineData, isLoading } = useQuery({
     queryKey: ["quarantine"],
     queryFn: async () => {
-      const res = await api.get<{ data: QuarantinedDevice[]; total: number }>(
-        "/quarantine",
-      );
+      const res = await api.get<ListResponseDevice>("/quarantine?limit=100");
       return res.data;
     },
     refetchInterval: 10000,
   });
 
   const releaseMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await api.post(`/quarantine/${id}/release`);
-      if (res.data?.error) throw new Error(res.data.error);
+    mutationFn: async ({
+      id,
+      targetVlanId,
+    }: {
+      id: string;
+      targetVlanId: number;
+    }) => {
+      const payload: definitions["ReleaseQuarantineRequest"] = {
+        target_vlan_id: targetVlanId,
+      };
+      const res = await api.post(`/quarantine/${id}/release`, payload);
       return res.data;
     },
     onSuccess: () => {
+      setReleaseModalData(null);
       queryClient.invalidateQueries({ queryKey: ["quarantine"] });
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+      queryClient.invalidateQueries({ queryKey: ["system-status"] });
     },
     onError: (error: any) => {
       alert(
-        error?.response?.data?.error ||
-          error?.message ||
+        error?.response?.data?.error?.message ||
           "Nie udało się zwolnić urządzenia z kwarantanny.",
       );
     },
   });
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    document.documentElement.classList.toggle("dark", !isDarkMode);
-  };
+  useEffect(() => {
+    if (isDarkMode) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  }, [isDarkMode]);
 
-  const handleLogout = () => {
+  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
+
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (e) {}
     localStorage.removeItem("csrf_token");
     window.location.href = "/login";
   };
 
-  const handleRelease = (id: string, name: string) => {
-    if (
-      window.confirm(
-        `Czy na pewno chcesz zwolnić urządzenie ${name || id} z kwarantanny?`,
-      )
-    ) {
-      releaseMutation.mutate(id);
+  const handleReleaseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (releaseModalData) {
+      releaseMutation.mutate({
+        id: releaseModalData.id,
+        targetVlanId: parseInt(selectedVlan, 10),
+      });
     }
   };
 
   const filteredDevices =
-    quarantineData?.data?.filter((dev) => {
-      return (
-        dev.mac_address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (dev.hostname &&
-          dev.hostname.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (dev.ip_address &&
-          dev.ip_address.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        dev.reason.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    quarantineData?.data?.filter((dev: Device) => {
+      const primaryMac =
+        dev.macs && dev.macs.length > 0 ? dev.macs[0].mac?.toLowerCase() : "";
+      const name = (dev.display_name || dev.model_name || "").toLowerCase();
+      const searchLower = searchQuery.toLowerCase();
+
+      return primaryMac?.includes(searchLower) || name.includes(searchLower);
     }) || [];
 
   return (
-    <div className="min-h-screen bg-gray-100 flex transition-colors duration-200 dark:bg-gray-950 font-sans">
+    <div className="min-h-screen bg-gray-100 flex transition-colors duration-200 dark:bg-gray-950 font-sans relative">
+      {releaseModalData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-200 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-50 dark:bg-[#1a1d21]">
+              <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Network className="w-5 h-5 text-emerald-500" /> Odblokuj
+                urządzenie
+              </h3>
+              <button
+                onClick={() => setReleaseModalData(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleReleaseSubmit} className="p-6 space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                Urządzenie{" "}
+                <strong className="text-gray-900 dark:text-white">
+                  {releaseModalData.name}
+                </strong>{" "}
+                opuści kwarantannę.
+              </p>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Wybierz docelowy VLAN
+                </label>
+                <select
+                  value={selectedVlan}
+                  onChange={(e) => setSelectedVlan(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm cursor-pointer"
+                >
+                  <option value="10">VLAN 10 (Trusted)</option>
+                  <option value="20">VLAN 20 (Guest)</option>
+                  <option value="30">VLAN 30 (IoT)</option>
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReleaseModalData(null)}
+                  className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  Anuluj
+                </button>
+                <button
+                  type="submit"
+                  disabled={releaseMutation.isPending}
+                  className="px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {releaseMutation.isPending ? "Zwalnianie..." : "Odblokuj"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {isSidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -118,48 +203,48 @@ export default function Quarantine() {
         </div>
 
         <nav className="p-2 space-y-0.5 flex-1 text-sm">
-          <a
-            href="/"
+          <Link
+            to="/"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Home className="w-4 h-4" /> Przegląd
-          </a>
-          <a
-            href="/quarantine"
+          </Link>
+          <Link
+            to="/quarantine"
             className="flex items-center gap-3 px-4 py-2.5 bg-blue-600 text-white rounded font-medium"
           >
             <ShieldBan className="w-4 h-4" /> Kwarantanna
-          </a>
-          <a
-            href="/devices"
+          </Link>
+          <Link
+            to="/devices"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Wifi className="w-4 h-4" /> Urządzenia
-          </a>
-          <a
-            href="/users"
+          </Link>
+          <Link
+            to="/users"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Users className="w-4 h-4" /> Użytkownicy
-          </a>
+          </Link>
           <div className="pt-4 mt-2 border-t border-gray-700/50">
-            <a
-              href="/account"
+            <Link
+              to="/account"
               className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
             >
               <UserIcon className="w-4 h-4" /> Moje Konto
-            </a>
-            <a
-              href="/settings"
+            </Link>
+            <Link
+              to="/settings"
               className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
             >
               <Settings className="w-4 h-4" /> Ustawienia Systemu
-            </a>
+            </Link>
           </div>
         </nav>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 z-10">
         <header className="h-16 bg-white shadow-sm flex items-center justify-between px-4 md:px-6 border-b border-gray-200 sticky top-0 z-30 dark:bg-gray-900 dark:border-gray-800">
           <div className="flex items-center">
             <button
@@ -206,7 +291,7 @@ export default function Quarantine() {
                 </div>
                 <input
                   type="text"
-                  placeholder="Szukaj urządzenia (MAC, IP...)"
+                  placeholder="Szukaj urządzenia (MAC, Nazwa)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none sm:text-sm"
@@ -220,7 +305,7 @@ export default function Quarantine() {
                   <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800">
                     <tr>
                       <th className="px-6 py-4">Urządzenie / Hostname</th>
-                      <th className="px-6 py-4">Adres MAC / IP</th>
+                      <th className="px-6 py-4">Adres MAC</th>
                       <th className="px-6 py-4">Powód kwarantanny</th>
                       <th className="px-6 py-4">Data dodania</th>
                       <th className="px-6 py-4 text-right">Akcje</th>
@@ -247,56 +332,67 @@ export default function Quarantine() {
                             Brak urządzeń w kwarantannie
                           </p>
                           <p className="text-sm mt-1">
-                            Sieć jest w pełni bezpieczna.
+                            Wszystko jest w porządku.
                           </p>
                         </td>
                       </tr>
                     ) : (
-                      filteredDevices.map((dev) => (
-                        <tr
-                          key={dev.id}
-                          className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                        >
-                          <td className="px-6 py-3">
-                            <div className="font-bold text-gray-900 dark:text-white">
-                              {dev.hostname || "Nieznane urządzenie"}
-                            </div>
-                            <div className="text-xs text-gray-500 font-mono">
-                              ID: {dev.id}
-                            </div>
-                          </td>
-                          <td className="px-6 py-3">
-                            <div className="font-mono text-xs font-semibold text-gray-800 dark:text-gray-200">
-                              {dev.mac_address}
-                            </div>
-                            <div className="text-xs text-gray-500 font-mono">
-                              {dev.ip_address || "Brak IP"}
-                            </div>
-                          </td>
-                          <td className="px-6 py-3">
-                            <span className="px-2.5 py-1 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 rounded text-xs font-bold">
-                              {dev.reason}
-                            </span>
-                          </td>
-                          <td className="px-6 py-3 text-xs text-gray-500 font-mono">
-                            {new Date(dev.created_at).toLocaleString()}
-                          </td>
-                          <td className="px-6 py-3 text-right">
-                            <button
-                              onClick={() =>
-                                handleRelease(
-                                  dev.id,
-                                  dev.hostname || dev.mac_address,
-                                )
-                              }
-                              disabled={releaseMutation.isPending}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-                            >
-                              <CheckCircle2 className="w-4 h-4" /> Odblokuj
-                            </button>
-                          </td>
-                        </tr>
-                      ))
+                      filteredDevices.map((dev: Device) => {
+                        const primaryMac =
+                          dev.macs && dev.macs.length > 0
+                            ? dev.macs[0].mac
+                            : "-";
+                        const displayName =
+                          dev.display_name ||
+                          dev.model_name ||
+                          primaryMac ||
+                          dev.id ||
+                          "Nieznane";
+
+                        return (
+                          <tr
+                            key={dev.id}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                          >
+                            <td className="px-6 py-3">
+                              <div className="font-bold text-gray-900 dark:text-white">
+                                {displayName}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {dev.vendor_name || "Nieznany producent"}
+                              </div>
+                            </td>
+                            <td className="px-6 py-3">
+                              <div className="font-mono text-xs font-semibold text-gray-800 dark:text-gray-200">
+                                {primaryMac}
+                              </div>
+                            </td>
+                            <td className="px-6 py-3">
+                              <span className="px-2.5 py-1 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 rounded text-[11px] uppercase font-bold">
+                                Blokada: {dev.classified_by || "System IDS"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-3 text-xs text-gray-500 font-mono">
+                              {dev.classified_at
+                                ? new Date(dev.classified_at).toLocaleString()
+                                : "-"}
+                            </td>
+                            <td className="px-6 py-3 text-right">
+                              <button
+                                onClick={() =>
+                                  setReleaseModalData({
+                                    id: dev.id as string,
+                                    name: displayName as string,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors"
+                              >
+                                <CheckCircle2 className="w-4 h-4" /> Odblokuj
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

@@ -18,81 +18,13 @@ import {
 import { api } from "../api/client";
 import type { definitions } from "../api/types";
 
-type BaseDevice = definitions["Device"];
-type Device = BaseDevice & {
-  id?: string;
-  name?: string;
-  ip_address?: string;
-  mac_address?: string;
-  is_random_mac?: boolean;
-  vendor?: string;
-  vlan_id?: number;
-  is_active?: boolean;
-  classification?: string;
-  classified_by?: string;
-  classified_at?: string;
-  last_seen?: string;
-  first_seen?: string;
-  notes?: string;
-  is_static_ip?: boolean;
-  psk?: string;
-};
-
-type DeviceSession = {
-  id: string;
-  start_time?: string;
-  end_time?: string;
-  ssid?: string;
-  bssid?: string;
-  rx_bytes?: number;
-  tx_bytes?: number;
-  disconnect_reason?: string;
-};
-
-type DeviceLease = {
-  id: string;
-  ip_address?: string;
-  mac_address?: string;
-  hostname?: string;
-  expires_at?: string;
-  state?: string;
-};
-
-type DeviceFingerprint = {
-  id: string;
-  os_name?: string;
-  os_version?: string;
-  method?: string;
-  confidence?: number;
-  last_seen?: string;
-};
-
-type DeviceDomain = {
-  id: string;
-  domain?: string;
-  query_count?: number;
-  blocked?: boolean;
-  last_queried?: string;
-};
-
-type DeviceAlert = {
-  id: string;
-  timestamp?: string;
-  severity?: string;
-  signature?: string;
-  dst_ip?: string;
-  dst_port?: number;
-};
-
-type DeviceFirewallRule = {
-  id: string;
-  name?: string;
-  action?: string;
-  direction?: string;
-  protocol?: string;
-  port?: string;
-  is_active?: boolean;
-};
+type Device = definitions["Device"];
+type DeviceSession = definitions["DeviceSession"];
+type DeviceLease = definitions["Lease"];
+type DeviceFingerprint = definitions["Fingerprint"];
+type DeviceDomain = definitions["DNSDomain"];
+type DeviceAlert = definitions["Alert"];
+type DeviceFirewallRule = definitions["FirewallRule"];
 
 export default function DeviceDetail() {
   const { id } = useParams();
@@ -130,7 +62,6 @@ export default function DeviceDetail() {
       );
       return res.data;
     },
-    enabled: activeTab === "leases",
     refetchInterval: 10000,
   });
 
@@ -174,7 +105,7 @@ export default function DeviceDetail() {
     queryKey: ["device-firewall", id],
     queryFn: async () => {
       const res = await api.get<{ data: DeviceFirewallRule[]; total: number }>(
-        `/devices/${id}/firewall`,
+        `/firewall/rules?device_id=${id}`,
       );
       return res.data;
     },
@@ -191,15 +122,6 @@ export default function DeviceDetail() {
     { id: "alerts", label: "Alerty IDS" },
     { id: "firewall", label: "Reguły Firewall" },
   ];
-
-  const formatBytes = (bytes?: number) => {
-    if (bytes === undefined || bytes === null) return "-";
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
 
   if (isLoading) {
     return (
@@ -223,6 +145,11 @@ export default function DeviceDetail() {
     );
   }
 
+  const primaryMac =
+    device.macs && device.macs.length > 0 ? device.macs[0] : null;
+  const currentLease = leasesData?.data?.find((l) => l.is_current);
+  const currentIp = currentLease?.ip_address || "-";
+
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 font-sans flex flex-col">
       <header className="h-14 bg-white shadow-sm flex items-center px-4 border-b border-gray-200 dark:bg-gray-900 dark:border-gray-800 shrink-0">
@@ -234,7 +161,7 @@ export default function DeviceDetail() {
         </button>
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
-            {device.name || "Nienazwany"}
+            {device.display_name || device.model_name || "Nienazwany"}
           </h1>
           <span
             className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${device.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : "bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`}
@@ -277,7 +204,7 @@ export default function DeviceDetail() {
             </div>
             <div>
               <div className="text-lg font-bold font-mono tracking-tight">
-                {device.ip_address || "Brak IP"}
+                {currentIp}
               </div>
               <div className="text-[11px] font-bold bg-white/20 inline-block px-1.5 py-0.5 rounded mt-1">
                 VLAN {device.vlan_id || "-"}
@@ -294,21 +221,23 @@ export default function DeviceDetail() {
             </div>
             <div>
               <div className="text-lg font-bold font-mono tracking-tight flex items-center gap-2">
-                {device.mac_address}
-                {device.is_random_mac && (
+                {primaryMac?.mac || "-"}
+                {primaryMac?.is_randomized && (
                   <span className="text-[9px] bg-red-500 text-white px-1 py-0.5 rounded">
                     RAND
                   </span>
                 )}
               </div>
               <div className="text-[11px] opacity-90 mt-1 truncate">
-                {device.vendor || "Nieznany producent"}
+                {device.vendor_name ||
+                  primaryMac?.oui_vendor ||
+                  "Nieznany producent"}
               </div>
             </div>
           </div>
 
           <div
-            className={`p-3 rounded shadow-sm flex flex-col justify-between h-24 ${device.classification === "quarantined" ? "bg-[#e53935]" : "bg-[#8e24aa]"}`}
+            className={`p-3 rounded shadow-sm flex flex-col justify-between h-24 ${device.classification === "quarantine" ? "bg-[#e53935]" : "bg-[#8e24aa]"}`}
           >
             <div className="flex items-center justify-between opacity-90">
               <span className="text-xs font-bold uppercase tracking-wider">
@@ -405,10 +334,14 @@ export default function DeviceDetail() {
                                 </>
                               ) : (
                                 <>
-                                  <span>{device.name || "Brak nazwy"}</span>
+                                  <span>
+                                    {device.display_name || "Brak nazwy"}
+                                  </span>
                                   <button
                                     onClick={() => {
-                                      setEditNameValue(device.name || "");
+                                      setEditNameValue(
+                                        device.display_name || "",
+                                      );
                                       setIsEditingName(true);
                                     }}
                                     className="text-blue-500 hover:bg-blue-50 p-1 rounded dark:hover:bg-blue-900/30"
@@ -424,8 +357,8 @@ export default function DeviceDetail() {
                               Adres MAC
                             </th>
                             <td className="py-2 px-3 font-mono text-gray-800 dark:text-gray-200">
-                              {device.mac_address}
-                              {device.is_random_mac && (
+                              {primaryMac?.mac || "-"}
+                              {primaryMac?.is_randomized && (
                                 <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-sans">
                                   Losowy
                                 </span>
@@ -437,7 +370,9 @@ export default function DeviceDetail() {
                               Producent (OUI)
                             </th>
                             <td className="py-2 px-3 font-mono text-gray-800 dark:text-gray-200">
-                              {device.vendor || "Nieznany"}
+                              {device.vendor_name ||
+                                primaryMac?.oui_vendor ||
+                                "Nieznany"}
                             </td>
                           </tr>
                           <tr>
@@ -540,13 +475,10 @@ export default function DeviceDetail() {
                         Koniec Sesji
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
-                        BSSID / SSID
-                      </th>
-                      <th className="px-4 py-2 border-b dark:border-gray-700 text-right">
-                        TX / RX Bajty
+                        MAC Związany
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
-                        Powód rozłączenia
+                        Powód rozłączenia (Kod)
                       </th>
                     </tr>
                   </thead>
@@ -554,7 +486,7 @@ export default function DeviceDetail() {
                     {sessionsLoading ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={4}
                           className="p-8 text-center font-sans text-gray-500"
                         >
                           Ładowanie historii sesji...
@@ -564,7 +496,7 @@ export default function DeviceDetail() {
                       sessionsData.data.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={4}
                           className="p-8 text-center font-sans text-gray-500"
                         >
                           Brak zarejestrowanych sesji dla tego urządzenia.
@@ -577,36 +509,22 @@ export default function DeviceDetail() {
                           className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
                         >
                           <td className="px-4 py-2">
-                            {session.start_time
-                              ? new Date(session.start_time).toLocaleString()
+                            {session.connected_at
+                              ? new Date(session.connected_at).toLocaleString()
                               : "-"}
                           </td>
                           <td className="px-4 py-2">
-                            {session.end_time ? (
-                              new Date(session.end_time).toLocaleString()
+                            {session.disconnected_at ? (
+                              new Date(session.disconnected_at).toLocaleString()
                             ) : (
                               <span className="text-emerald-600 font-bold dark:text-emerald-400">
                                 Trwa...
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-2">
-                            {session.bssid || "-"} <br />
-                            <span className="text-[10px] text-gray-400 font-sans">
-                              {session.ssid || ""}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2 text-right">
-                            <span className="text-blue-600 dark:text-blue-400">
-                              {formatBytes(session.tx_bytes)}
-                            </span>
-                            <span className="mx-1 text-gray-400">/</span>
-                            <span className="text-purple-600 dark:text-purple-400">
-                              {formatBytes(session.rx_bytes)}
-                            </span>
-                          </td>
+                          <td className="px-4 py-2">{session.mac || "-"}</td>
                           <td className="px-4 py-2 font-sans text-[11px] text-gray-500">
-                            {session.disconnect_reason || "-"}
+                            {session.disconnect_code || "-"}
                           </td>
                         </tr>
                       ))
@@ -631,7 +549,7 @@ export default function DeviceDetail() {
                         Adres MAC
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
-                        Hostname (DHCP)
+                        Typ Przypisania
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
                         Wygasa
@@ -658,42 +576,34 @@ export default function DeviceDetail() {
                         </td>
                       </tr>
                     ) : (
-                      leasesData.data.map((lease) => {
-                        const isActive =
-                          lease.state === "active" || lease.state === "bound";
-                        return (
-                          <tr
-                            key={lease.id}
-                            className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                          >
-                            <td className="px-4 py-2">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-sans ${isActive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}
-                              >
-                                {lease.state || "unknown"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2 font-bold text-gray-800 dark:text-gray-200">
-                              {lease.ip_address || "-"}
-                            </td>
-                            <td className="px-4 py-2">
-                              {lease.mac_address || "-"}
-                            </td>
-                            <td className="px-4 py-2 font-sans text-gray-700 dark:text-gray-300">
-                              {lease.hostname || (
-                                <span className="text-gray-400 italic">
-                                  brak podanego
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2 font-sans text-[11px] text-gray-500">
-                              {lease.expires_at
-                                ? new Date(lease.expires_at).toLocaleString()
-                                : "-"}
-                            </td>
-                          </tr>
-                        );
-                      })
+                      leasesData.data.map((lease) => (
+                        <tr
+                          key={lease.id}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                        >
+                          <td className="px-4 py-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-sans ${lease.is_current ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}
+                            >
+                              {lease.is_current ? "Active" : "Expired"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 font-bold text-gray-800 dark:text-gray-200">
+                            {lease.ip_address || "-"}
+                          </td>
+                          <td className="px-4 py-2">{lease.mac || "-"}</td>
+                          <td className="px-4 py-2 font-sans text-gray-700 dark:text-gray-300">
+                            {lease.is_static
+                              ? "Static (Rezerwacja)"
+                              : "Dynamic (Pula)"}
+                          </td>
+                          <td className="px-4 py-2 font-sans text-[11px] text-gray-500">
+                            {lease.lease_end
+                              ? new Date(lease.lease_end).toLocaleString()
+                              : "-"}
+                          </td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>
@@ -706,13 +616,10 @@ export default function DeviceDetail() {
                   <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500 dark:text-gray-400">
                     <tr>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
-                        System Operacyjny
+                        Wartość / Sygnatura OS
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
-                        Wersja
-                      </th>
-                      <th className="px-4 py-2 border-b dark:border-gray-700">
-                        Metoda detekcji
+                        Źródło detekcji
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
                         Pewność (%)
@@ -726,7 +633,7 @@ export default function DeviceDetail() {
                     {fingerprintsLoading ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={4}
                           className="p-8 text-center font-sans text-gray-500"
                         >
                           Ładowanie fingerprintów...
@@ -736,7 +643,7 @@ export default function DeviceDetail() {
                       fingerprintsData.data.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={4}
                           className="p-8 text-center font-sans text-gray-500"
                         >
                           Brak zebranych fingerprintów dla tego urządzenia.
@@ -749,14 +656,11 @@ export default function DeviceDetail() {
                           className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
                         >
                           <td className="px-4 py-2 font-sans font-bold text-gray-800 dark:text-gray-200">
-                            {fp.os_name || "Nieznany"}
-                          </td>
-                          <td className="px-4 py-2 font-sans">
-                            {fp.os_version || "-"}
+                            {fp.value || "Nieznany"}
                           </td>
                           <td className="px-4 py-2">
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase font-sans bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400">
-                              {fp.method || "DHCP"}
+                              {fp.source || "-"}
                             </span>
                           </td>
                           <td className="px-4 py-2">
@@ -773,8 +677,8 @@ export default function DeviceDetail() {
                             </div>
                           </td>
                           <td className="px-4 py-2 font-sans text-[11px] text-gray-500">
-                            {fp.last_seen
-                              ? new Date(fp.last_seen).toLocaleString()
+                            {fp.observed_at
+                              ? new Date(fp.observed_at).toLocaleString()
                               : "-"}
                           </td>
                         </tr>
@@ -834,17 +738,17 @@ export default function DeviceDetail() {
                           </td>
                           <td className="px-4 py-2">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-sans ${domain.blocked ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"}`}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-sans ${domain.is_blocked ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"}`}
                             >
-                              {domain.blocked ? "Blocked" : "Allowed"}
+                              {domain.is_blocked ? "Blocked" : "Allowed"}
                             </span>
                           </td>
                           <td className="px-4 py-2 text-blue-600 dark:text-blue-400">
                             {domain.query_count || 0}
                           </td>
                           <td className="px-4 py-2 font-sans text-[11px] text-gray-500">
-                            {domain.last_queried
-                              ? new Date(domain.last_queried).toLocaleString()
+                            {domain.last_seen
+                              ? new Date(domain.last_seen).toLocaleString()
                               : "-"}
                           </td>
                         </tr>
@@ -935,7 +839,7 @@ export default function DeviceDetail() {
                   <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500 dark:text-gray-400">
                     <tr>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
-                        Nazwa reguły
+                        Komentarz / Cel
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
                         Kierunek
@@ -978,7 +882,7 @@ export default function DeviceDetail() {
                           className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
                         >
                           <td className="px-4 py-2 font-sans text-gray-800 dark:text-gray-200 font-medium">
-                            {rule.name || "-"}
+                            {rule.comment || "-"}
                           </td>
                           <td className="px-4 py-2">
                             <span className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 px-2 py-0.5 rounded text-[10px] uppercase font-bold font-sans">
@@ -986,7 +890,7 @@ export default function DeviceDetail() {
                             </span>
                           </td>
                           <td className="px-4 py-2 text-blue-600 dark:text-blue-400">
-                            {rule.protocol || "TCP"} : {rule.port || "any"}
+                            {rule.protocol || "TCP"} : {rule.dst_port || "any"}
                           </td>
                           <td className="px-4 py-2">
                             <span
@@ -997,7 +901,7 @@ export default function DeviceDetail() {
                           </td>
                           <td className="px-4 py-2 text-center">
                             <span
-                              className={`inline-block w-2.5 h-2.5 rounded-full ${rule.is_active !== false ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"}`}
+                              className={`inline-block w-2.5 h-2.5 rounded-full ${rule.enabled !== false ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"}`}
                             />
                           </td>
                         </tr>

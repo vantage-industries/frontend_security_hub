@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Menu,
@@ -18,8 +19,10 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { api } from "../api/client";
+import type { definitions } from "../api/types";
 
 export default function Account() {
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -32,42 +35,39 @@ export default function Account() {
   const [pwdError, setPwdError] = useState("");
   const [pwdSuccess, setPwdSuccess] = useState("");
 
-  const { data: currentUser } = useQuery({
-    queryKey: ["users-me"],
+  const { data: sessionData } = useQuery({
+    queryKey: ["session"],
     queryFn: async () => {
-      try {
-        const res = await api.get<any>("/users/me");
-        return res.data;
-      } catch (e) {
-        return { username: "Administrator", role: "admin" };
-      }
+      const res =
+        await api.get<definitions["SessionResponse"]>("/auth/session");
+      return res.data;
     },
   });
 
   const changePasswordMutation = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: definitions["ChangePasswordRequest"] = {
         current_password: passwordForm.currentPassword,
         new_password: passwordForm.newPassword,
       };
-
-      const res = await api.put("/users/me/password", payload);
-      if (res.data?.error) throw new Error(res.data.error);
+      const res = await api.post("/auth/password", payload);
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setPwdSuccess("Hasło zostało pomyślnie zmienione!");
       setPasswordForm({
         currentPassword: "",
         newPassword: "",
         confirmPassword: "",
       });
+      if (data && data.csrf_token) {
+        localStorage.setItem("csrf_token", data.csrf_token);
+      }
       setTimeout(() => setPwdSuccess(""), 4000);
     },
     onError: (error: any) => {
       setPwdError(
-        error?.response?.data?.error ||
-          error?.message ||
+        error?.response?.data?.error?.message ||
           "Nie udało się zmienić hasła. Sprawdź obecne hasło.",
       );
     },
@@ -96,7 +96,10 @@ export default function Account() {
     document.documentElement.classList.toggle("dark", !isDarkMode);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (e) {}
     localStorage.removeItem("csrf_token");
     window.location.href = "/login";
   };
@@ -124,43 +127,43 @@ export default function Account() {
         </div>
 
         <nav className="p-2 space-y-0.5 flex-1 text-sm">
-          <a
-            href="/"
+          <Link
+            to="/"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Home className="w-4 h-4" /> Przegląd
-          </a>
-          <a
-            href="/quarantine"
+          </Link>
+          <Link
+            to="/quarantine"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <ShieldBan className="w-4 h-4" /> Kwarantanna
-          </a>
-          <a
-            href="/devices"
+          </Link>
+          <Link
+            to="/devices"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Wifi className="w-4 h-4" /> Urządzenia
-          </a>
-          <a
-            href="/users"
+          </Link>
+          <Link
+            to="/users"
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
           >
             <Users className="w-4 h-4" /> Użytkownicy
-          </a>
+          </Link>
           <div className="pt-4 mt-2 border-t border-gray-700/50">
-            <a
-              href="/account"
+            <Link
+              to="/account"
               className="flex items-center gap-3 px-4 py-2.5 bg-blue-600 text-white rounded font-medium"
             >
               <UserIcon className="w-4 h-4" /> Moje Konto
-            </a>
-            <a
-              href="/settings"
+            </Link>
+            <Link
+              to="/settings"
               className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
             >
               <Settings className="w-4 h-4" /> Ustawienia Systemu
-            </a>
+            </Link>
           </div>
         </nav>
       </aside>
@@ -208,16 +211,16 @@ export default function Account() {
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-2xl font-bold uppercase">
-                  {currentUser?.username?.charAt(0) || "U"}
+                  {sessionData?.username?.charAt(0) || "U"}
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {currentUser?.full_name ||
-                      currentUser?.username ||
+                    {sessionData?.full_name ||
+                      sessionData?.username ||
                       "Użytkownik"}
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    {currentUser?.role || "Brak roli"}
+                    {sessionData?.role || "Brak roli"}
                   </p>
                 </div>
               </div>
