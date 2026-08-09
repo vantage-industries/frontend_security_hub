@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Activity,
@@ -9,7 +9,6 @@ import {
   ShieldAlert,
   Wifi,
   Key,
-  Globe,
   Trash2,
   Save,
   Edit2,
@@ -17,6 +16,11 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import type { definitions } from "../api/types";
+import ConfirmByName from "../components/ConfirmByName";
+import ClassifyDialog from "../components/ClassifyDialog";
+import PskDialog from "../components/PskDialog";
+import StaticIpDialog from "../components/StaticIpDialog";
+import InternetWindowButton from "../components/InternetWindowButton";
 
 type Device = definitions["Device"];
 type DeviceSession = definitions["DeviceSession"];
@@ -32,6 +36,31 @@ export default function DeviceDetail() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState("");
+  const [showDelete, setShowDelete] = useState(false);
+  const [showClassify, setShowClassify] = useState(false);
+  const [showPsk, setShowPsk] = useState(false);
+  const [showStaticIp, setShowStaticIp] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const deleteDevice = useMutation({
+    mutationFn: async () => {
+      await api.delete(`/devices/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+      queryClient.invalidateQueries({ queryKey: ["system-status"] });
+      navigate("/devices");
+    },
+    onError: (err: unknown) => {
+      const e = err as {
+        response?: { data?: { error?: { message?: string } } };
+      };
+      setDeleteError(
+        e?.response?.data?.error?.message || "Nie udało się usunąć urządzenia.",
+      );
+    },
+  });
 
   const { data: device, isLoading } = useQuery({
     queryKey: ["device", id],
@@ -257,23 +286,84 @@ export default function DeviceDetail() {
         </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded shadow-sm p-2 flex flex-wrap gap-2 items-center">
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded text-xs font-semibold transition-colors">
+          <button
+            onClick={() => setShowClassify(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded text-xs font-semibold transition-colors"
+          >
             <Network className="w-4 h-4" /> Reklasyfikacja (Zmień VLAN)
           </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors">
-            <Key className="w-4 h-4" /> Rotacja PSK
+          <button
+            onClick={() => setShowPsk(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
+          >
+            <Key className="w-4 h-4" />{" "}
+            {device.has_psk ? "Rotacja PSK" : "Wydaj PSK"}
           </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors">
+          <button
+            onClick={() => setShowStaticIp(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
+          >
             <Wifi className="w-4 h-4" /> Statyczne IP
           </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors">
-            <Globe className="w-4 h-4" /> Okno Internetowe
-          </button>
+          <InternetWindowButton deviceId={id!} />
           <div className="flex-1"></div>
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded text-xs font-semibold transition-colors border border-red-200 dark:border-red-900/50">
+          <button
+            onClick={() => setShowDelete(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded text-xs font-semibold transition-colors border border-red-200 dark:border-red-900/50"
+          >
             <Trash2 className="w-4 h-4" /> Usuń urządzenie
           </button>
         </div>
+
+        {showStaticIp && (
+          <StaticIpDialog
+            device={device}
+            deviceId={id!}
+            onClose={() => setShowStaticIp(false)}
+          />
+        )}
+
+        {showPsk && (
+          <PskDialog
+            device={device}
+            deviceId={id!}
+            onClose={() => setShowPsk(false)}
+          />
+        )}
+
+        {showClassify && (
+          <ClassifyDialog
+            device={device}
+            deviceId={id!}
+            onClose={() => setShowClassify(false)}
+          />
+        )}
+
+        {showDelete && (
+          <ConfirmByName
+            title="Usuń urządzenie"
+            expected={
+              device.display_name ||
+              device.model_name ||
+              primaryMac?.mac ||
+              "urządzenie"
+            }
+            consequences={[
+              "Wpis zostaje w bazie, żeby log audytowy i historia nadal się rozwiązywały.",
+              "Bieżąca dzierżawa DHCP zostanie zamknięta, a otwarte sesje zakończone.",
+              "Reguły firewalla przypięte do urządzenia zostaną wyłączone, a PSK odwołany.",
+              "Adresy MAC znikają twardo — ten sam sprzęt może przejść onboarding od nowa.",
+            ]}
+            confirmLabel="Usuń urządzenie"
+            isPending={deleteDevice.isPending}
+            error={deleteError}
+            onClose={() => {
+              setShowDelete(false);
+              setDeleteError(null);
+            }}
+            onConfirm={() => deleteDevice.mutate()}
+          />
+        )}
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded shadow-sm flex flex-col flex-1 min-h-[400px]">
           <div className="flex overflow-x-auto border-b border-gray-200 dark:border-gray-800 hide-scrollbar bg-gray-50 dark:bg-gray-800/50">

@@ -1,0 +1,123 @@
+warning: in the working copy of 'src/api/types.ts', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/src/api/types.ts b/src/api/types.ts[m
+[1mindex f8e6474..487a8d9 100644[m
+[1m--- a/src/api/types.ts[m
+[1m+++ b/src/api/types.ts[m
+[36m@@ -2064,5 +2064,9 @@[m [mexport interface paths {[m
+     /**[m
+[31m-     * **Owner only**, and re-authenticated in the request body: possession of a live session is not enough[m
+[31m-     * authority to wipe an appliance. Supply the current password, a TOTP code when enrolled, and[m
+[31m-     * `confirm: "factory-reset"` — the literal operation name, so a misdirected click cannot do this.[m
+[32m+[m[32m     * Requires `system:factory_reset` — **owner only**, and re-authenticated in the request body:[m
+[32m+[m[32m     * possession of a live session is not enough authority to wipe an appliance. Supply the current[m
+[32m+[m[32m     * password, a TOTP code when enrolled, and `confirm: "factory-reset"` — the literal operation name,[m
+[32m+[m[32m     * so a misdirected click cannot do this.[m
+[32m+[m[32m     *[m
+[32m+[m[32m     * This one stays with the owner while `/system/reboot` does not: a reboot costs a minute of[m
+[32m+[m[32m     * downtime, a reset destroys every segment, policy and device identity with no undo.[m
+      */[m
+[36m@@ -2097,4 +2101,7 @@[m [mexport interface paths {[m
+     /**[m
+[31m-     * **Owner only**, re-authenticated in the request body exactly as the factory reset is. Supply the[m
+[31m-     * current password, a TOTP code when enrolled, and `confirm: "reboot"`.[m
+[32m+[m[32m     * Requires `system:reboot` — **admin and owner**. Restoring service is an availability action an[m
+[32m+[m[32m     * administrator has to be able to take without waking the owner.[m
+[32m+[m[32m     *[m
+[32m+[m[32m     * Re-authenticated in the request body exactly as the factory reset is. Supply the current password,[m
+[32m+[m[32m     * a TOTP code when enrolled, and `confirm: "reboot"`.[m
+      */[m
+[36m@@ -2250,3 +2257,4 @@[m [mexport interface paths {[m
+     /**[m
+[31m-     * Requires `user:delete` — **owner only**. A soft delete, with the username rewritten so it can be[m
+[32m+[m[32m     * Requires `user:delete`, plus the role check: an owner may delete anyone, an admin only operator[m
+[32m+[m[32m     * and viewer accounts. A soft delete, with the username rewritten so it can be[m
+      * claimed again: the unique index survives soft deletion, so leaving it in place would make the name[m
+[36m@@ -2361,2 +2369,37 @@[m [mexport interface paths {[m
+   };[m
+[32m+[m[32m  "/users/{id}/enable": {[m
+[32m+[m[32m    /**[m
+[32m+[m[32m     * Requires `user:write`, plus the role check. The counterpart to disable: the account can sign in[m
+[32m+[m[32m     * again. Any brute-force lockout is cleared at the same time, because a disabled *and* locked[m
+[32m+[m[32m     * account would otherwise come back still unable to sign in.[m
+[32m+[m[32m     *[m
+[32m+[m[32m     * Existing sessions are **not** restored — disabling revoked them, and the user signs in afresh.[m
+[32m+[m[32m     */[m
+[32m+[m[32m    post: {[m
+[32m+[m[32m      parameters: {[m
+[32m+[m[32m        path: {[m
+[32m+[m[32m          /** User UUID */[m
+[32m+[m[32m          id: string;[m
+[32m+[m[32m        };[m
+[32m+[m[32m      };[m
+[32m+[m[32m      responses: {[m
+[32m+[m[32m        /** OK */[m
+[32m+[m[32m        200: {[m
+[32m+[m[32m          schema: definitions["MessageResponse"];[m
+[32m+[m[32m        };[m
+[32m+[m[32m        /** unauthenticated */[m
+[32m+[m[32m        401: {[m
+[32m+[m[32m          schema: definitions["ErrorResponse"];[m
+[32m+[m[32m        };[m
+[32m+[m[32m        /** permission_denied or csrf_token_invalid */[m
+[32m+[m[32m        403: {[m
+[32m+[m[32m          schema: definitions["ErrorResponse"];[m
+[32m+[m[32m        };[m
+[32m+[m[32m        /** user_not_found */[m
+[32m+[m[32m        404: {[m
+[32m+[m[32m          schema: definitions["ErrorResponse"];[m
+[32m+[m[32m        };[m
+[32m+[m[32m      };[m
+[32m+[m[32m    };[m
+[32m+[m[32m  };[m
+   "/users/{id}/password-reset": {[m
+[36m@@ -2691,7 +2734,3 @@[m [mexport interface definitions {[m
+   ClassifyDeviceRequest: {[m
+[31m-    /**[m
+[31m-     * @description Classification is optional: it is derived from the VLAN when omitted, and must agree with it[m
+[31m-     * when supplied.[m
+[31m-     * @enum {string}[m
+[31m-     */[m
+[32m+[m[32m    /** @enum {string} */[m
+     classification?:[m
+[36m@@ -2774,9 +2813,8 @@[m [mexport interface definitions {[m
+     first_seen?: string;[m
+[31m-    /**[m
+[31m-     * @description HasPSK reports whether the device currently holds a credential, without disclosing its[m
+[31m-     * identifier. The PSK secret is never exposed here; even the identifier is need-to-know.[m
+[31m-     */[m
+     has_psk?: boolean;[m
+     id?: string;[m
+[32m+[m[32m    ip_address?: string;[m
+[32m+[m[32m    ip_addresses?: string[];[m
+     is_active?: boolean;[m
+[32m+[m[32m    is_static_ip?: boolean;[m
+     last_seen?: string;[m
+[36m@@ -2840,6 +2878,2 @@[m [mexport interface definitions {[m
+   InternetWindowRequest: {[m
+[31m-    /**[m
+[31m-     * @description Bounded at 24 hours: a "timed" grant longer than a day is a permanent rule wearing a[m
+[31m-     * disguise, and should be authored as one so it shows up in the deviation report.[m
+[31m-     */[m
+     minutes: number;[m
+[36m@@ -3005,3 +3039,2 @@[m [mexport interface definitions {[m
+   ReauthRequest: {[m
+[31m-    /** @description Confirm must be the literal resource name, so a misdirected click cannot wipe an appliance. */[m
+     confirm: string;[m
+[36m@@ -3097,3 +3130,2 @@[m [mexport interface definitions {[m
+     action?: "accept" | "drop" | "reject";[m
+[31m-    /** @description ClearDstPort and ClearExpiry make "set to null" explicit for the nullable columns. */[m
+     clear_dst_port?: boolean;[m
+[36m@@ -3120,6 +3152,2 @@[m [mexport interface definitions {[m
+     client_isolation?: boolean;[m
+[31m-    /**[m
+[31m-     * @description DetachProfile makes "set to null" explicit, since a missing key and an explicit null are[m
+[31m-     * indistinguishable once decoded into *uint.[m
+[31m-     */[m
+     detach_profile?: boolean;[m
+[36m@@ -3144,6 +3172,2 @@[m [mexport interface definitions {[m
+     id?: string;[m
+[31m-    /**[m
+[31m-     * @description IsLocked is derived rather than exposing LockedUntil, which would let a caller time a[m
+[31m-     * lockout window precisely.[m
+[31m-     */[m
+     is_locked?: boolean;[m

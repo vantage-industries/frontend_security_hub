@@ -2062,9 +2062,13 @@ export interface paths {
   };
   "/system/factory-reset": {
     /**
-     * **Owner only**, and re-authenticated in the request body: possession of a live session is not enough
-     * authority to wipe an appliance. Supply the current password, a TOTP code when enrolled, and
-     * `confirm: "factory-reset"` — the literal operation name, so a misdirected click cannot do this.
+     * Requires `system:factory_reset` — **owner only**, and re-authenticated in the request body:
+     * possession of a live session is not enough authority to wipe an appliance. Supply the current
+     * password, a TOTP code when enrolled, and `confirm: "factory-reset"` — the literal operation name,
+     * so a misdirected click cannot do this.
+     *
+     * This one stays with the owner while `/system/reboot` does not: a reboot costs a minute of
+     * downtime, a reset destroys every segment, policy and device identity with no undo.
      */
     post: {
       parameters: {
@@ -2095,8 +2099,11 @@ export interface paths {
   };
   "/system/reboot": {
     /**
-     * **Owner only**, re-authenticated in the request body exactly as the factory reset is. Supply the
-     * current password, a TOTP code when enrolled, and `confirm: "reboot"`.
+     * Requires `system:reboot` — **admin and owner**. Restoring service is an availability action an
+     * administrator has to be able to take without waking the owner.
+     *
+     * Re-authenticated in the request body exactly as the factory reset is. Supply the current password,
+     * a TOTP code when enrolled, and `confirm: "reboot"`.
      */
     post: {
       parameters: {
@@ -2248,7 +2255,8 @@ export interface paths {
       };
     };
     /**
-     * Requires `user:delete` — **owner only**. A soft delete, with the username rewritten so it can be
+     * Requires `user:delete`, plus the role check: an owner may delete anyone, an admin only operator
+     * and viewer accounts. A soft delete, with the username rewritten so it can be
      * claimed again: the unique index survives soft deletion, so leaving it in place would make the name
      * permanently unusable. History is unaffected, because the audit log stores the actor's username
      * alongside the reference and therefore outlives the account.
@@ -2331,6 +2339,41 @@ export interface paths {
     /**
      * Requires `user:write`, plus the role check. The account can no longer sign in and its sessions are
      * revoked immediately. The **last active owner cannot be disabled**.
+     */
+    post: {
+      parameters: {
+        path: {
+          /** User UUID */
+          id: string;
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["MessageResponse"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied or csrf_token_invalid */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** user_not_found */
+        404: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
+  "/users/{id}/enable": {
+    /**
+     * Requires `user:write`, plus the role check. The counterpart to disable: the account can sign in
+     * again. Any brute-force lockout is cleared at the same time, because a disabled *and* locked
+     * account would otherwise come back still unable to sign in.
+     *
+     * Existing sessions are **not** restored — disabling revoked them, and the user signs in afresh.
      */
     post: {
       parameters: {
@@ -2689,11 +2732,7 @@ export interface definitions {
     new_password: string;
   };
   ClassifyDeviceRequest: {
-    /**
-     * @description Classification is optional: it is derived from the VLAN when omitted, and must agree with it
-     * when supplied.
-     * @enum {string}
-     */
+    /** @enum {string} */
     classification?:
       | "quarantine"
       | "trusted"
@@ -2772,13 +2811,12 @@ export interface definitions {
     classified_by?: string;
     display_name?: string;
     first_seen?: string;
-    /**
-     * @description HasPSK reports whether the device currently holds a credential, without disclosing its
-     * identifier. The PSK secret is never exposed here; even the identifier is need-to-know.
-     */
     has_psk?: boolean;
     id?: string;
+    ip_address?: string;
+    ip_addresses?: string[];
     is_active?: boolean;
+    is_static_ip?: boolean;
     last_seen?: string;
     macs?: definitions["DeviceMAC"][];
     model_name?: string;
@@ -2838,10 +2876,6 @@ export interface definitions {
     last_generation?: number;
   };
   InternetWindowRequest: {
-    /**
-     * @description Bounded at 24 hours: a "timed" grant longer than a day is a permanent rule wearing a
-     * disguise, and should be authored as one so it shows up in the deviation report.
-     */
     minutes: number;
   };
   Lease: {
@@ -3003,7 +3037,6 @@ export interface definitions {
     protocol?: string;
   };
   ReauthRequest: {
-    /** @description Confirm must be the literal resource name, so a misdirected click cannot wipe an appliance. */
     confirm: string;
     password: string;
     totp_code?: string;
@@ -3095,7 +3128,6 @@ export interface definitions {
   UpdateFirewallRuleRequest: {
     /** @enum {string} */
     action?: "accept" | "drop" | "reject";
-    /** @description ClearDstPort and ClearExpiry make "set to null" explicit for the nullable columns. */
     clear_dst_port?: boolean;
     clear_expiry?: boolean;
     comment?: string;
@@ -3118,10 +3150,6 @@ export interface definitions {
   };
   UpdateVLANRequest: {
     client_isolation?: boolean;
-    /**
-     * @description DetachProfile makes "set to null" explicit, since a missing key and an explicit null are
-     * indistinguishable once decoded into *uint.
-     */
     detach_profile?: boolean;
     display_name?: string;
     policy_profile_id?: number;
@@ -3142,10 +3170,6 @@ export interface definitions {
     email?: string;
     full_name?: string;
     id?: string;
-    /**
-     * @description IsLocked is derived rather than exposing LockedUntil, which would let a caller time a
-     * lockout window precisely.
-     */
     is_locked?: boolean;
     last_login_at?: string;
     mfa_enabled?: boolean;

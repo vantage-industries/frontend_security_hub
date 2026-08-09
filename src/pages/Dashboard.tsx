@@ -2,11 +2,6 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Menu,
-  X,
-  Home,
-  Settings,
-  Users,
-  LayoutDashboard,
   Moon,
   Sun,
   LogOut,
@@ -17,7 +12,6 @@ import {
   ShieldBan,
   Clock,
   Network,
-  User as UserIcon,
 } from "lucide-react";
 import {
   PieChart,
@@ -28,6 +22,7 @@ import {
   Legend,
 } from "recharts";
 import { api } from "../api/client";
+import Sidebar from "../components/Sidebar";
 import type { definitions } from "../api/types";
 import { Link } from "react-router-dom";
 
@@ -130,73 +125,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex transition-colors duration-200 dark:bg-gray-950 font-sans">
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#2a2f35] text-gray-300 shadow-xl transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 lg:static flex flex-col`}
-      >
-        <div className="h-16 flex items-center justify-between px-6 bg-[#202428] border-b border-gray-800">
-          <div className="flex items-center gap-2 font-bold text-xl text-white">
-            <LayoutDashboard className="w-5 h-5 text-blue-500" />
-            <span>SecurityHub</span>
-          </div>
-          <button className="lg:hidden" onClick={() => setIsSidebarOpen(false)}>
-            <X className="w-6 h-6 text-gray-400" />
-          </button>
-        </div>
-
-        <nav className="p-2 space-y-0.5 flex-1 text-sm">
-          <Link
-            to="/"
-            className="flex items-center gap-3 px-4 py-2.5 bg-blue-600 text-white rounded font-medium"
-          >
-            <Home className="w-4 h-4" /> Przegląd
-          </Link>
-          <Link
-            to="/vlans"
-            className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
-          >
-            <Network className="w-4 h-4" /> Segmenty Sieci
-          </Link>
-          <Link
-            to="/quarantine"
-            className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
-          >
-            <ShieldBan className="w-4 h-4" /> Kwarantanna
-          </Link>
-          <Link
-            to="/devices"
-            className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
-          >
-            <Wifi className="w-4 h-4" /> Urządzenia
-          </Link>
-          <Link
-            to="/users"
-            className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
-          >
-            <Users className="w-4 h-4" /> Użytkownicy
-          </Link>
-          <div className="pt-4 mt-2 border-t border-gray-700/50">
-            <Link
-              to="/account"
-              className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
-            >
-              <UserIcon className="w-4 h-4" /> Moje Konto
-            </Link>
-            <Link
-              to="/settings"
-              className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 rounded transition-colors"
-            >
-              <Settings className="w-4 h-4" /> Ustawienia Systemu
-            </Link>
-          </div>
-        </nav>
-      </aside>
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-white shadow-sm flex items-center justify-between px-4 md:px-6 border-b border-gray-200 sticky top-0 z-30 dark:bg-gray-900 dark:border-gray-800">
