@@ -21,7 +21,7 @@ import {
 import { api } from "../api/client";
 import type { definitions } from "../api/types";
 
-type Device = definitions["Device"];
+// type Device = definitions["Device"];
 type ListResponseDevice =
   definitions["ListResponse-security-hub_internal_dto_Device"];
 

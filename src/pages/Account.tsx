@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Menu,
@@ -22,7 +22,7 @@ import { api } from "../api/client";
 import type { definitions } from "../api/types";
 
 export default function Account() {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 

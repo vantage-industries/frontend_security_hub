@@ -23,12 +23,12 @@ import {
   KeyRound,
   AlertTriangle,
   Ban,
-  CheckCircle2,
+  //CheckCircle2,
 } from "lucide-react";
 import { api } from "../api/client";
 import type { definitions } from "../api/types";
 
-type User = definitions["User"];
+//type User = definitions["User"];
 
 export default function Users() {
   const queryClient = useQueryClient();

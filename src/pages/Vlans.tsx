@@ -24,7 +24,7 @@ import { api } from "../api/client";
 import type { definitions } from "../api/types";
 
 type VLAN = definitions["VLAN"];
-type PolicyProfile = definitions["PolicyProfile"];
+//type PolicyProfile = definitions["PolicyProfile"];
 type ListResponseVLAN =
   definitions["ListResponse-security-hub_internal_dto_VLAN"];
 type ListResponsePolicy =
