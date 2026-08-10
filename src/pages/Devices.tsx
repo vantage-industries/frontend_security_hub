@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import Sidebar from "../components/Sidebar";
+import AddDeviceButton from "../components/AddDeviceButton";
 import type { definitions } from "../api/types";
 
 // type Device = definitions["Device"];
@@ -105,6 +106,10 @@ export default function Devices() {
         </header>
 
         <main className="flex-1 p-4 md:p-4 overflow-auto flex flex-col">
+          <div className="mb-4 flex justify-end">
+            <AddDeviceButton />
+          </div>
+
           <div className="bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-800 p-3 mb-4 flex flex-wrap gap-3 items-center justify-between">
             <div className="flex items-center gap-2 flex-1 min-w-[240px]">
               <Search className="w-4 h-4 text-gray-400 ml-1" />

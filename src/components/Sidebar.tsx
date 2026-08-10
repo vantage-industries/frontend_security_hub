@@ -1,4 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api/client";
+import type { definitions } from "../api/types";
 import {
   X,
   LayoutDashboard,
@@ -13,6 +16,9 @@ import {
   Settings,
 } from "lucide-react";
 
+type ListResponseDevice =
+  definitions["ListResponse-security-hub_internal_dto_Device"];
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
@@ -26,7 +32,7 @@ type NavItem = {
 
 const mainNav: NavItem[] = [
   { to: "/", label: "Przegląd", icon: Home },
-  { to: "/onboarding", label: "Onboarding", icon: Inbox },
+  { to: "/onboarding", label: "Nowe urządzenia", icon: Inbox },
   { to: "/quarantine", label: "Kwarantanna", icon: ShieldBan },
   { to: "/devices", label: "Urządzenia", icon: Wifi },
   { to: "/vlans", label: "Segmenty sieci", icon: Network },
@@ -47,6 +53,20 @@ function isActive(pathname: string, to: string): boolean {
 export default function Sidebar({ isOpen, onClose }: Props) {
   const { pathname } = useLocation();
 
+  const { data: pending } = useQuery({
+    queryKey: ["onboarding-pending"],
+    queryFn: async () => {
+      const res = await api.get<ListResponseDevice>(
+        "/onboarding/pending?limit=1",
+      );
+      return res.data;
+    },
+    refetchInterval: 30000,
+    retry: false,
+  });
+
+  const waiting = pending?.total ?? 0;
+
   const renderItem = ({ to, label, icon: Icon }: NavItem) => {
     const active = isActive(pathname, to);
     return (
@@ -61,7 +81,13 @@ export default function Sidebar({ isOpen, onClose }: Props) {
             : "hover:bg-gray-800 text-gray-300"
         }`}
       >
-        <Icon className="w-4 h-4" /> {label}
+        <Icon className="w-4 h-4" />
+        <span className="flex-1">{label}</span>
+        {to === "/onboarding" && waiting > 0 && (
+          <span className="rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            {waiting}
+          </span>
+        )}
       </Link>
     );
   };

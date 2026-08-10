@@ -258,7 +258,7 @@ export default function Onboarding() {
               <Menu className="w-6 h-6" />
             </button>
             <h1 className="text-lg font-semibold text-gray-800 dark:text-white">
-              Skrzynka Onboardingu
+              Nowe urządzenia
             </h1>
           </div>
 
