@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Globe, X } from "lucide-react";
 import { api } from "../api/client";
+import { useSession } from "../hooks/useSession";
 
 type Props = {
   deviceId: string;
@@ -38,6 +39,7 @@ function errorMessage(err: unknown, fallback: string): string {
 
 export default function InternetWindowButton({ deviceId }: Props) {
   const queryClient = useQueryClient();
+  const { can } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [minutes, setMinutes] = useState(60);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +108,13 @@ export default function InternetWindowButton({ deviceId }: Props) {
           setError(null);
           setIsOpen(true);
         }}
-        className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
+        disabled={!can("device:internet_window:grant")}
+        title={
+          can("device:internet_window:grant")
+            ? undefined
+            : "Wymaga uprawnienia device:internet_window:grant"
+        }
+        className="disabled:cursor-not-allowed disabled:opacity-40 flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
       >
         <Globe className="w-4 h-4" /> Okno Internetowe
       </button>

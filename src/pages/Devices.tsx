@@ -28,6 +28,18 @@ export default function Devices() {
   const [search, setSearch] = useState("");
   const [vlanFilter, setVlanFilter] = useState("");
   const [classificationFilter, setClassificationFilter] = useState("");
+
+  const { data: vlanData } = useQuery({
+    queryKey: ["vlans"],
+    queryFn: async () => {
+      const res =
+        await api.get<
+          definitions["ListResponse-security-hub_internal_dto_VLAN"]
+        >("/vlans");
+      return res.data;
+    },
+    staleTime: 300000,
+  });
   const [page, setPage] = useState(0);
   const limit = 15;
 
@@ -135,11 +147,12 @@ export default function Devices() {
                 }}
                 className="bg-gray-50 border border-gray-200 dark:bg-gray-800 dark:border-gray-700 text-xs rounded px-2 py-1.5 text-gray-700 dark:text-gray-300 focus:outline-none"
               >
-                <option value="">Wszystkie VLANy</option>
-                <option value="10">VLAN 10</option>
-                <option value="20">VLAN 20</option>
-                <option value="30">VLAN 30</option>
-                <option value="99">VLAN 99</option>
+                <option value="">Wszystkie segmenty</option>
+                {(vlanData?.data ?? []).map((v) => (
+                  <option key={v.vid} value={v.vid}>
+                    VLAN {v.vid} — {v.display_name || v.name}
+                  </option>
+                ))}
               </select>
 
               <select
@@ -151,10 +164,13 @@ export default function Devices() {
                 className="bg-gray-50 border border-gray-200 dark:bg-gray-800 dark:border-gray-700 text-xs rounded px-2 py-1.5 text-gray-700 dark:text-gray-300 focus:outline-none"
               >
                 <option value="">Wszystkie klasy</option>
-                <option value="trusted">Trusted</option>
-                <option value="guest">Guest</option>
+                <option value="trusted">Zaufane</option>
+                <option value="guest">Goście</option>
                 <option value="iot">IoT</option>
-                <option value="quarantined">Quarantined</option>
+                <option value="cam">Kamery</option>
+                <option value="cloud_native">Chmurowe</option>
+                <option value="services">Usługi</option>
+                <option value="quarantine">Kwarantanna</option>
               </select>
             </div>
           </div>
@@ -180,6 +196,9 @@ export default function Devices() {
                       Klasyfikacja
                     </th>
                     <th className="px-3 py-2 border-b dark:border-gray-700">
+                      Adres IP
+                    </th>
+                    <th className="px-3 py-2 border-b dark:border-gray-700">
                       Adres MAC
                     </th>
                     <th className="px-3 py-2 border-b dark:border-gray-700">
@@ -191,7 +210,7 @@ export default function Devices() {
                   {isLoading ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={8}
                         className="p-8 text-center font-sans text-gray-500"
                       >
                         Ładowanie urządzeń...
@@ -200,7 +219,7 @@ export default function Devices() {
                   ) : devicesData?.data?.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={8}
                         className="p-8 text-center font-sans text-gray-500"
                       >
                         Brak urządzeń.
@@ -242,6 +261,14 @@ export default function Devices() {
                             <span className="px-1.5 py-0.5 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded text-[10px]">
                               {device.classification || "unassigned"}
                             </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            {device.ip_address || "-"}
+                            {device.is_static_ip && (
+                              <span className="ml-1 text-[9px] bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 px-1 rounded">
+                                STAT
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-2">
                             {macEntry?.mac || "-"}

@@ -61,7 +61,7 @@ export default function Onboarding() {
   const [approveModalData, setApproveModalData] = useState<Device | null>(null);
   const [approveForm, setApproveForm] = useState({
     displayName: "",
-    vlanId: "10",
+    vlanId: "",
   });
 
   const { data: pendingData, isLoading } = useQuery({
@@ -74,6 +74,20 @@ export default function Onboarding() {
     },
     refetchInterval: 10000,
   });
+
+  const { data: vlanData, isLoading: vlansLoading } = useQuery({
+    queryKey: ["vlans"],
+    queryFn: async () => {
+      const res =
+        await api.get<
+          definitions["ListResponse-security-hub_internal_dto_VLAN"]
+        >("/vlans");
+      return res.data;
+    },
+    staleTime: 300000,
+  });
+
+  const vlans = vlanData?.data ?? [];
 
   const approveMutation = useMutation({
     mutationFn: async ({
@@ -149,7 +163,7 @@ export default function Onboarding() {
     const mac = device.macs && device.macs.length > 0 ? device.macs[0].mac : "";
     setApproveForm({
       displayName: device.vendor_name || mac || "Nowe Urządzenie",
-      vlanId: "10",
+      vlanId: "",
     });
     setApproveModalData(device);
   };
@@ -216,10 +230,15 @@ export default function Onboarding() {
                   }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm cursor-pointer"
                 >
-                  <option value="10">VLAN 10 (Zaufane / Trusted)</option>
-                  <option value="20">VLAN 20 (Goście / Guest)</option>
-                  <option value="30">VLAN 30 (IoT / Smart Home)</option>
-                  <option value="40">VLAN 40 (Kamery IP / CAM)</option>
+                  <option value="">
+                    {vlansLoading ? "Pobieram segmenty..." : "— wybierz —"}
+                  </option>
+                  {vlans.map((v) => (
+                    <option key={v.vid} value={v.vid}>
+                      VLAN {v.vid} — {v.display_name || v.name}
+                      {v.is_deployed === false ? " (niewdrożony)" : ""}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -233,7 +252,7 @@ export default function Onboarding() {
                 </button>
                 <button
                   type="submit"
-                  disabled={approveMutation.isPending}
+                  disabled={approveMutation.isPending || !approveForm.vlanId}
                   className="px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {approveMutation.isPending

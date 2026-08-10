@@ -25,7 +25,19 @@ export default function Account() {
   });
 
   const [pwdError, setPwdError] = useState("");
+  const [pwdFieldErrors, setPwdFieldErrors] = useState<{
+    current_password?: string;
+    new_password?: string;
+    confirm_password?: string;
+  }>({});
   const [pwdSuccess, setPwdSuccess] = useState("");
+
+  const fieldClass = (error?: string) =>
+    `w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 outline-none text-sm ${
+      error
+        ? "border-red-500 focus:ring-red-500"
+        : "border-gray-300 dark:border-gray-700 focus:ring-blue-500"
+    }`;
 
   const { data: sessionData } = useQuery({
     queryKey: ["session"],
@@ -57,10 +69,45 @@ export default function Account() {
       }
       setTimeout(() => setPwdSuccess(""), 4000);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const body = (
+        error as {
+          response?: {
+            data?: {
+              error?: {
+                code?: string;
+                message?: string;
+                fields?: { [key: string]: string };
+              };
+            };
+          };
+        }
+      )?.response?.data?.error;
+
+      const next: {
+        current_password?: string;
+        new_password?: string;
+        confirm_password?: string;
+      } = {};
+
+      if (body?.fields) {
+        if (body.fields.current_password) {
+          next.current_password = body.fields.current_password;
+        }
+        if (body.fields.new_password) {
+          next.new_password = body.fields.new_password;
+        }
+      }
+
+      if (body?.code === "invalid_credentials") {
+        next.current_password = "Obecne hasło jest nieprawidłowe.";
+      }
+
+      setPwdFieldErrors(next);
       setPwdError(
-        error?.response?.data?.error?.message ||
-          "Nie udało się zmienić hasła. Sprawdź obecne hasło.",
+        Object.keys(next).length > 0
+          ? ""
+          : body?.message || "Nie udało się zmienić hasła.",
       );
     },
   });
@@ -69,14 +116,26 @@ export default function Account() {
     e.preventDefault();
     setPwdError("");
     setPwdSuccess("");
+    setPwdFieldErrors({});
 
+    const next: {
+      current_password?: string;
+      new_password?: string;
+      confirm_password?: string;
+    } = {};
+
+    if (!passwordForm.currentPassword) {
+      next.current_password = "Podaj obecne hasło.";
+    }
+    if (passwordForm.newPassword.length < 12) {
+      next.new_password = "Nowe hasło musi mieć co najmniej 12 znaków.";
+    }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPwdError("Nowe hasła nie są identyczne!");
-      return;
+      next.confirm_password = "Hasła nie są identyczne.";
     }
 
-    if (passwordForm.newPassword.length < 8) {
-      setPwdError("Nowe hasło musi mieć co najmniej 8 znaków.");
+    if (Object.keys(next).length > 0) {
+      setPwdFieldErrors(next);
       return;
     }
 
@@ -198,8 +257,14 @@ export default function Account() {
                       })
                     }
                     placeholder="••••••••••••"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    aria-invalid={!!pwdFieldErrors.current_password}
+                    className={fieldClass(pwdFieldErrors.current_password)}
                   />
+                  {pwdFieldErrors.current_password && (
+                    <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+                      {pwdFieldErrors.current_password}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -216,8 +281,14 @@ export default function Account() {
                       })
                     }
                     placeholder="••••••••••••"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    aria-invalid={!!pwdFieldErrors.new_password}
+                    className={fieldClass(pwdFieldErrors.new_password)}
                   />
+                  {pwdFieldErrors.new_password && (
+                    <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+                      {pwdFieldErrors.new_password}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -234,8 +305,14 @@ export default function Account() {
                       })
                     }
                     placeholder="••••••••••••"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    aria-invalid={!!pwdFieldErrors.confirm_password}
+                    className={fieldClass(pwdFieldErrors.confirm_password)}
                   />
+                  {pwdFieldErrors.confirm_password && (
+                    <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+                      {pwdFieldErrors.confirm_password}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="submit"

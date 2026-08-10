@@ -18,6 +18,9 @@ import type { definitions } from "../api/types";
 type Device = definitions["Device"];
 type ListResponseDevice =
   definitions["ListResponse-security-hub_internal_dto_Device"];
+type VLAN = definitions["VLAN"];
+type ListResponseVLAN =
+  definitions["ListResponse-security-hub_internal_dto_VLAN"];
 
 export default function Quarantine() {
   const queryClient = useQueryClient();
@@ -28,8 +31,9 @@ export default function Quarantine() {
   const [releaseModalData, setReleaseModalData] = useState<{
     id: string;
     name: string;
+    vlanId?: number;
   } | null>(null);
-  const [selectedVlan, setSelectedVlan] = useState("10");
+  const [selectedVlan, setSelectedVlan] = useState("");
 
   useQuery({
     queryKey: ["session"],
@@ -49,6 +53,21 @@ export default function Quarantine() {
     },
     refetchInterval: 10000,
   });
+
+  const { data: vlanData, isLoading: vlansLoading } = useQuery({
+    queryKey: ["vlans"],
+    queryFn: async () => {
+      const res = await api.get<ListResponseVLAN>("/vlans");
+      return res.data;
+    },
+    staleTime: 300000,
+  });
+
+  const vlans: VLAN[] = vlanData?.data ?? [];
+  const availableVlans = vlans.filter(
+    (v) => v.vid !== releaseModalData?.vlanId,
+  );
+  const chosenVlan = vlans.find((v) => String(v.vid) === selectedVlan);
 
   const releaseMutation = useMutation({
     mutationFn: async ({
@@ -105,12 +124,14 @@ export default function Quarantine() {
 
   const filteredDevices =
     quarantineData?.data?.filter((dev: Device) => {
-      const primaryMac =
-        dev.macs && dev.macs.length > 0 ? dev.macs[0].mac?.toLowerCase() : "";
-      const name = (dev.display_name || dev.model_name || "").toLowerCase();
-      const searchLower = searchQuery.toLowerCase();
+      const name = (
+        dev.display_name ||
+        dev.model_name ||
+        dev.vendor_name ||
+        ""
+      ).toLowerCase();
 
-      return primaryMac?.includes(searchLower) || name.includes(searchLower);
+      return name.includes(searchQuery.toLowerCase());
     }) || [];
 
   return (
@@ -146,12 +167,25 @@ export default function Quarantine() {
                 <select
                   value={selectedVlan}
                   onChange={(e) => setSelectedVlan(e.target.value)}
+                  disabled={vlansLoading}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm cursor-pointer"
                 >
-                  <option value="10">VLAN 10 (Trusted)</option>
-                  <option value="20">VLAN 20 (Guest)</option>
-                  <option value="30">VLAN 30 (IoT)</option>
+                  <option value="">
+                    {vlansLoading ? "Pobieram segmenty..." : "— wybierz —"}
+                  </option>
+                  {availableVlans.map((v) => (
+                    <option key={v.vid} value={v.vid}>
+                      VLAN {v.vid} — {v.display_name || v.name}
+                      {v.is_deployed === false ? " (niewdrożony)" : ""}
+                    </option>
+                  ))}
                 </select>
+                {chosenVlan?.is_deployed === false && (
+                  <p className="mt-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                    Ten segment nie jest wdrożony. Urządzenie straci łączność do
+                    czasu jego uruchomienia.
+                  </p>
+                )}
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-3">
@@ -164,7 +198,7 @@ export default function Quarantine() {
                 </button>
                 <button
                   type="submit"
-                  disabled={releaseMutation.isPending}
+                  disabled={releaseMutation.isPending || !selectedVlan}
                   className="px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {releaseMutation.isPending ? "Zwalnianie..." : "Odblokuj"}
@@ -187,7 +221,7 @@ export default function Quarantine() {
               <Menu className="w-6 h-6" />
             </button>
             <h1 className="text-lg font-semibold text-gray-800 dark:text-white">
-              Kwarantanna Sieciowa
+              Kwarantanna
             </h1>
           </div>
 
@@ -224,7 +258,7 @@ export default function Quarantine() {
                 </div>
                 <input
                   type="text"
-                  placeholder="Szukaj urządzenia (MAC, Nazwa)..."
+                  placeholder="Szukaj urządzenia po nazwie..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none sm:text-sm"
@@ -238,7 +272,6 @@ export default function Quarantine() {
                   <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800">
                     <tr>
                       <th className="px-6 py-4">Urządzenie / Hostname</th>
-                      <th className="px-6 py-4">Adres MAC</th>
                       <th className="px-6 py-4">Powód kwarantanny</th>
                       <th className="px-6 py-4">Data dodania</th>
                       <th className="px-6 py-4 text-right">Akcje</th>
@@ -248,7 +281,7 @@ export default function Quarantine() {
                     {isLoading ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={4}
                           className="p-8 text-center text-gray-500"
                         >
                           Pobieranie listy kwarantanny...
@@ -257,7 +290,7 @@ export default function Quarantine() {
                     ) : filteredDevices.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={4}
                           className="p-16 text-center text-gray-500 flex flex-col items-center justify-center"
                         >
                           <ShieldAlert className="w-12 h-12 text-emerald-500 mb-3 opacity-80" />
@@ -296,11 +329,6 @@ export default function Quarantine() {
                               </div>
                             </td>
                             <td className="px-6 py-3">
-                              <div className="font-mono text-xs font-semibold text-gray-800 dark:text-gray-200">
-                                {primaryMac}
-                              </div>
-                            </td>
-                            <td className="px-6 py-3">
                               <span className="px-2.5 py-1 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 rounded text-[11px] uppercase font-bold">
                                 Blokada: {dev.classified_by || "System IDS"}
                               </span>
@@ -312,12 +340,14 @@ export default function Quarantine() {
                             </td>
                             <td className="px-6 py-3 text-right">
                               <button
-                                onClick={() =>
+                                onClick={() => {
+                                  setSelectedVlan("");
                                   setReleaseModalData({
                                     id: dev.id as string,
                                     name: displayName as string,
-                                  })
-                                }
+                                    vlanId: dev.vlan_id,
+                                  });
+                                }}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors"
                               >
                                 <CheckCircle2 className="w-4 h-4" /> Odblokuj

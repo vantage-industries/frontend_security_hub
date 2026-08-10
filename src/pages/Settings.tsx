@@ -175,8 +175,8 @@ export default function Settings() {
               >
                 <AlertTriangle className="w-5 h-5" />
                 {reauthModalType === "factory-reset"
-                  ? "Ustawienia Fabryczne"
-                  : "Restart Systemu"}
+                  ? "Przywrócenie ustawień fabrycznych"
+                  : "Ponowne uruchomienie"}
               </h3>
               <button
                 onClick={() => {
@@ -531,19 +531,18 @@ export default function Settings() {
                   <div className="mb-4">
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                       <RefreshCw className="w-5 h-5 text-orange-600 dark:text-orange-500" />{" "}
-                      Miękki Restart (Reboot)
+                      Ponowne uruchomienie
                     </h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      Bezpieczne ponowne uruchomienie systemu operacyjnego
-                      appliance'u. Urządzenia stracą łączność na około 60
-                      sekund.
+                      Hub uruchomi się od nowa. Urządzenia stracą łączność na
+                      około minutę, a konfiguracja zostaje nienaruszona.
                     </p>
                   </div>
                   <button
                     onClick={() => setReauthModalType("reboot")}
                     className="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 dark:text-orange-400 rounded-lg text-sm font-bold transition-colors"
                   >
-                    Zrestartuj SecurityHub
+                    Uruchom ponownie
                   </button>
                 </div>
 
@@ -552,25 +551,25 @@ export default function Settings() {
                   <div className="relative z-10">
                     <div className="mb-4">
                       <h2 className="text-lg font-bold text-red-700 dark:text-red-500 flex items-center gap-2">
-                        <Shield className="w-5 h-5" /> Przywrócenie Ustawień
-                        Fabrycznych
+                        <Shield className="w-5 h-5" /> Przywrócenie ustawień
+                        fabrycznych
                       </h2>
                       <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 max-w-2xl">
                         Ta operacja jest{" "}
                         <strong className="text-red-600 dark:text-red-400">
                           nieodwracalna
                         </strong>
-                        . Usunięte zostaną wszystkie zasady firewall,
-                        urządzenia, logi bezpieczeństwa oraz konta użytkowników.
-                        Baza danych zostanie zniszczona, a hub powróci do ekranu
-                        początkowego (Bootstrap).
+                        . Usunięte zostaną wszystkie segmenty, profile polityk,
+                        reguły firewalla, urządzenia, dzienniki bezpieczeństwa i
+                        konta użytkowników. Hub wróci do stanu sprzed pierwszej
+                        konfiguracji i trzeba go będzie skonfigurować od zera.
                       </p>
                     </div>
                     <button
                       onClick={() => setReauthModalType("factory-reset")}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-colors shadow-sm"
                     >
-                      Wymaż urządzenie (Factory Reset)
+                      Przywróć ustawienia fabryczne
                     </button>
                   </div>
                 </div>

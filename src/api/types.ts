@@ -563,8 +563,16 @@ export interface paths {
   };
   "/devices": {
     /**
-     * Requires `device:read`. Soft-deleted devices are excluded. The current IP address is deliberately
-     * not a field here — see GET /devices/{id}/leases.
+     * Requires `device:read`. Soft-deleted devices are excluded.
+     *
+     * Three different questions can be asked of this list, and they are deliberately separate filters:
+     * `active` is the **administrative** flag — whether the device is enabled at all. `connected` is
+     * **observed** — whether hostapd reports an open association right now, maintained by the device
+     * observer. `seen_since` is **historical** — devices whose `last_seen` falls at or after an RFC3339
+     * timestamp, which is how you ask "what has been on this network in the last week".
+     *
+     * A device that has never associated has a null `last_seen` and matches no `seen_since`. Most IoT
+     * hardware sleeps, so `active=true&connected=false` is the normal state, not a fault.
      */
     get: {
       parameters: {
@@ -580,8 +588,12 @@ export interface paths {
             | "cam"
             | "iot"
             | "services";
-          /** Filter by whether the device is currently active */
+          /** Filter by the administrative enabled flag */
           active?: boolean;
+          /** Filter by an open association — on the network right now */
+          connected?: boolean;
+          /** Only devices last seen at or after this RFC3339 timestamp */
+          seen_since?: string;
           /** Substring match on display name, vendor or model */
           search?: string;
           /** Page size (default 50, max 500) */
@@ -605,6 +617,64 @@ export interface paths {
         };
         /** permission_denied */
         403: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
+  "/devices/enroll": {
+    /**
+     * Requires `device:enroll`. **This is how a device joins the appliance.** Because identity is anchored
+     * to a per-device PSK, and hostapd refuses to associate a station whose passphrase is not already in
+     * `wpa_psk_file`, a device cannot appear on the network and be discovered afterwards — the credential is
+     * minted first and the device then arrives holding it.
+     *
+     * The device is created in the **quarantine** segment with no classification, so it appears immediately
+     * under GET /onboarding/pending with `awaiting_first_connection: true`. Once it associates, the observer
+     * records its MAC, session and lease, `last_seen` starts moving, and the operator places it with
+     * POST /onboarding/{id}/approve. The target segment is deliberately **not** an input here.
+     *
+     * `mac` is optional and is only a convenience — it resolves the vendor from the OUI table up front and
+     * is rejected if another device already holds it. It is never the device's identity.
+     *
+     * `psk` is optional. Omit it and the appliance generates a key at `device_psk_length` from
+     * GET /wifi/settings — 12 lowercase characters by default, drawn from an alphabet with `0`/`O` and
+     * `1`/`l`/`I` removed, because someone has to retype it on a phone keyboard with no paste. Supply one
+     * for a device whose vendor app will not accept anything else; it must be 8–63 printable ASCII
+     * characters, must not begin or end with whitespace, and is refused if it is one of the most commonly
+     * used passwords.
+     *
+     * **The response contains a live credential**, shown exactly once and stored nowhere: it reaches no log
+     * and no audit entry, only the `wpa_psk_file` the access point reads. Check `credential_sync` — anything
+     * other than `applied` means hostapd has not learned the key yet and the device cannot associate with
+     * it yet.
+     */
+    post: {
+      parameters: {
+        body: {
+          /** Label, and optionally the MAC printed on the device */
+          request: definitions["EnrollDeviceRequest"];
+        };
+      };
+      responses: {
+        /** The device, and its key shown once */
+        201: {
+          schema: definitions["CredentialResponse"];
+        };
+        /** validation_failed, invalid_mac, invalid_device_passphrase or weak_device_passphrase */
+        400: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied or csrf_token_invalid */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** mac_in_use or vlan_not_deployed */
+        409: {
           schema: definitions["ErrorResponse"];
         };
       };
@@ -1033,11 +1103,16 @@ export interface paths {
     /**
      * Requires `device:psk:rotate`. Device identity is anchored to a per-device PSK rather than to a MAC
      * address, because MAC randomisation breaks MAC-anchored identity — rotating this key is therefore how a
-     * device's credential is replaced, and the previous one is marked revoked.
+     * device's credential is replaced, and the previous one is marked revoked. The device keeps its segment,
+     * its history and its rules; only the passphrase changes.
      *
-     * **This is the only response in the API that contains a live credential.** The key is shown exactly
-     * once: nothing persists it and it never reaches a log or the audit trail, so it cannot be retrieved
-     * again. If it is lost, rotate again.
+     * **This response contains a live credential.** The key is shown exactly once: nothing persists it and
+     * it never reaches a log or the audit trail, so it cannot be retrieved again. If it is lost, rotate
+     * again. `credential_sync` reports whether the access point has learned it — until it has, the device
+     * cannot associate with the new key.
+     *
+     * The body is optional: send none and the appliance generates a typable key at the configured
+     * length, exactly as enrolment does. Send `{"psk": "..."}` to set one of your own.
      */
     post: {
       parameters: {
@@ -1045,11 +1120,19 @@ export interface paths {
           /** Device UUID */
           id: string;
         };
+        body: {
+          /** Optionally, a key of your own */
+          request?: definitions["RotatePSKRequest"];
+        };
       };
       responses: {
         /** The new key, shown once */
         200: {
-          schema: definitions["RotatePSKResponse"];
+          schema: definitions["CredentialResponse"];
+        };
+        /** invalid_device_passphrase or weak_device_passphrase */
+        400: {
+          schema: definitions["ErrorResponse"];
         };
         /** unauthenticated */
         401: {
@@ -1313,8 +1396,10 @@ export interface paths {
   };
   "/firewall/apply": {
     /**
-     * Requires `firewall:apply`. Renders the active rules and installs them atomically, recording a numbered
-     * generation with the ruleset it contained, so POST /firewall/rollback has something to return to.
+     * Requires `firewall:apply`. Records the intent as a new desired generation and waits briefly for the
+     * reconciler to render and install it; a slow apply returns `sync.status: "pending"` and GET
+     * /firewall/status is the poll target. The installed generation is recorded with its ruleset, so
+     * POST /firewall/rollback has something to return to.
      */
     post: {
       responses: {
@@ -1589,6 +1674,29 @@ export interface paths {
         };
         /** profile_rule_immutable */
         409: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
+  "/firewall/status": {
+    /**
+     * Requires `firewall:read`. The database holds the desired ruleset generation; a reconciler converges the
+     * kernel toward it. This reports both numbers, whether they match, the rollback hold, and the last error —
+     * drift is an observable state here, never a silent one.
+     */
+    get: {
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["FirewallStatusResponse"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied */
+        403: {
           schema: definitions["ErrorResponse"];
         };
       };
@@ -2135,10 +2243,14 @@ export interface paths {
   "/system/status": {
     /**
      * Requires `system:read`. Aggregates the database, the detection and radio services, the headline
-     * counts and the last applied firewall generation.
+     * counts, the last applied firewall generation and the last device-observation pass.
      *
      * A degraded subsystem is reported as a field rather than raised as an error: a status endpoint that
      * fails when something is wrong is useless exactly when it is needed.
+     *
+     * `observation` is the loop behind every device's `last_seen` and `ip_address`. If `running` is false
+     * or `error` is set, the API's picture of which devices are connected is stale — the appliance keeps
+     * routing and filtering regardless.
      */
     get: {
       responses: {
@@ -2699,7 +2811,9 @@ export interface definitions {
     timestamp?: string;
   };
   ApplyFirewallResponse: {
+    /** @description the desired generation this apply recorded */
     generation?: number;
+    sync?: definitions["FirewallSync"];
   };
   ApproveOnboardingRequest: {
     display_name?: string;
@@ -2745,7 +2859,9 @@ export interface definitions {
   };
   ClassifyResponse: {
     device?: definitions["Device"];
+    /** @description the desired generation this move bumped */
     firewall_generation?: number;
+    firewall_sync?: definitions["FirewallSync"];
     new_lease_ip?: string;
     previous_vlan_id?: number;
     rules_applied?: number;
@@ -2783,6 +2899,17 @@ export interface definitions {
     role: "owner" | "admin" | "operator" | "viewer";
     username: string;
   };
+  CredentialResponse: {
+    credential_sync?: definitions["FirewallSync"];
+    device?: definitions["Device"];
+    firewall_generation?: number;
+    operator_supplied?: boolean;
+    psk?: string;
+    psk_id?: string;
+    ssid?: string;
+    warning?: string;
+    wifi_qr_payload?: string;
+  };
   DNSDomain: {
     device_id?: string;
     domain?: string;
@@ -2806,9 +2933,11 @@ export interface definitions {
     total?: number;
   };
   Device: {
+    awaiting_first_connection?: boolean;
     classification?: string;
     classified_at?: string;
     classified_by?: string;
+    connected_at?: string;
     display_name?: string;
     first_seen?: string;
     has_psk?: boolean;
@@ -2816,6 +2945,7 @@ export interface definitions {
     ip_address?: string;
     ip_addresses?: string[];
     is_active?: boolean;
+    is_connected?: boolean;
     is_static_ip?: boolean;
     last_seen?: string;
     macs?: definitions["DeviceMAC"][];
@@ -2840,6 +2970,12 @@ export interface definitions {
     id?: number;
     mac?: string;
     vlan_id?: number;
+  };
+  EnrollDeviceRequest: {
+    display_name: string;
+    mac?: string;
+    notes?: string;
+    psk?: string;
   };
   ErrorResponse: {
     error?: definitions["Payload"];
@@ -2874,6 +3010,36 @@ export interface definitions {
   FirewallStatus: {
     applied_at?: string;
     last_generation?: number;
+  };
+  FirewallStatusResponse: {
+    applied_generation?: number;
+    desired_generation?: number;
+    in_sync?: boolean;
+    /** @description RFC3339 UTC */
+    last_applied_at?: string;
+    last_attempt_at?: string;
+    last_error?: string;
+    last_error_at?: string;
+    rollback_hold?: boolean;
+  };
+  FirewallSync: {
+    applied_generation?: number;
+    error?: string;
+    /** @description applied|pending|failed */
+    status?: string;
+  };
+  HostInfo: {
+    /** @description RFC3339 UTC */
+    booted_at?: string;
+    disk_free_bytes?: number;
+    disk_total_bytes?: number;
+    hostname?: string;
+    load_avg_1?: number;
+    /** @description MemAvailable where the kernel reports it */
+    mem_free_bytes?: number;
+    mem_total_bytes?: number;
+    uptime_seconds?: number;
+    version?: string;
   };
   InternetWindowRequest: {
     minutes: number;
@@ -3004,6 +3170,19 @@ export interface definitions {
     randomized?: boolean;
     vendor?: string;
   };
+  Observation: {
+    at?: string;
+    error?: string;
+    leases?: number;
+    leases_recorded?: number;
+    macs_learned?: number;
+    running?: boolean;
+    sessions_closed?: number;
+    sessions_opened?: number;
+    stations?: number;
+    unknown_leases?: number;
+    unknown_stations?: number;
+  };
   PasswordPolicy: {
     common_passwords_count?: number;
     max_length?: number;
@@ -3036,6 +3215,21 @@ export interface definitions {
     priority?: number;
     protocol?: string;
   };
+  Preflight: {
+    backend?: string;
+    checks?: definitions["PreflightCheck"][];
+    /** @description RFC3339 UTC */
+    probed_at?: string;
+    ready?: boolean;
+  };
+  PreflightCheck: {
+    detail?: string;
+    /** @description binary|module|path|capability|backend */
+    kind?: string;
+    name?: string;
+    ok?: boolean;
+    optional?: boolean;
+  };
   ReauthRequest: {
     confirm: string;
     password: string;
@@ -3066,9 +3260,8 @@ export interface definitions {
   RollbackRequest: {
     generation: number;
   };
-  RotatePSKResponse: {
+  RotatePSKRequest: {
     psk?: string;
-    warning?: string;
   };
   ServiceHealth: {
     enabled?: boolean;
@@ -3117,6 +3310,9 @@ export interface definitions {
     counts?: definitions["Counts"];
     database?: definitions["DatabaseStatus"];
     firewall?: definitions["FirewallStatus"];
+    host?: definitions["HostInfo"];
+    observation?: definitions["Observation"];
+    preflight?: definitions["Preflight"];
     services?: definitions["ServicesStatus"];
     uptime_seconds?: number;
     version?: string;
@@ -3158,6 +3354,7 @@ export interface definitions {
     /** @enum {string} */
     band?: "2_4" | "5" | "dual";
     channel?: number;
+    device_psk_length?: number;
     min_psk_entropy?: number;
     pmf_enabled?: boolean;
     pmf_required?: boolean;
@@ -3200,6 +3397,7 @@ export interface definitions {
   WiFiSettings: {
     band?: string;
     channel?: number;
+    device_psk_length?: number;
     min_psk_entropy?: number;
     pmf_enabled?: boolean;
     pmf_required?: boolean;

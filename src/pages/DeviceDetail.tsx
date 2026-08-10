@@ -21,6 +21,7 @@ import ClassifyDialog from "../components/ClassifyDialog";
 import PskDialog from "../components/PskDialog";
 import StaticIpDialog from "../components/StaticIpDialog";
 import InternetWindowButton from "../components/InternetWindowButton";
+import { useSession } from "../hooks/useSession";
 
 type Device = definitions["Device"];
 type DeviceSession = definitions["DeviceSession"];
@@ -40,8 +41,31 @@ export default function DeviceDetail() {
   const [showClassify, setShowClassify] = useState(false);
   const [showPsk, setShowPsk] = useState(false);
   const [showStaticIp, setShowStaticIp] = useState(false);
+  const [notesDraft, setNotesDraft] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const updateDevice = useMutation({
+    mutationFn: async (payload: definitions["UpdateDeviceRequest"]) => {
+      const res = await api.patch<Device>(`/devices/${id}`, payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      setSaveError(null);
+      queryClient.invalidateQueries({ queryKey: ["device", id] });
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+    },
+    onError: (err: unknown) => {
+      const e = err as {
+        response?: { data?: { error?: { message?: string } } };
+      };
+      setSaveError(
+        e?.response?.data?.error?.message || "Nie udało się zapisać zmian.",
+      );
+    },
+  });
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { can } = useSession();
 
   const deleteDevice = useMutation({
     mutationFn: async () => {
@@ -68,7 +92,6 @@ export default function DeviceDetail() {
       const res = await api.get<Device>(`/devices/${id}`);
       return res.data;
     },
-    refetchInterval: 10000,
   });
 
   const { data: sessionsData, isLoading: sessionsLoading } = useQuery({
@@ -80,7 +103,6 @@ export default function DeviceDetail() {
       return res.data;
     },
     enabled: activeTab === "sessions",
-    refetchInterval: 10000,
   });
 
   const { data: leasesData, isLoading: leasesLoading } = useQuery({
@@ -91,7 +113,7 @@ export default function DeviceDetail() {
       );
       return res.data;
     },
-    refetchInterval: 10000,
+    enabled: activeTab === "leases",
   });
 
   const { data: fingerprintsData, isLoading: fingerprintsLoading } = useQuery({
@@ -103,7 +125,6 @@ export default function DeviceDetail() {
       return res.data;
     },
     enabled: activeTab === "fingerprints",
-    refetchInterval: 10000,
   });
 
   const { data: domainsData, isLoading: domainsLoading } = useQuery({
@@ -115,7 +136,6 @@ export default function DeviceDetail() {
       return res.data;
     },
     enabled: activeTab === "domains",
-    refetchInterval: 10000,
   });
 
   const { data: alertsData, isLoading: alertsLoading } = useQuery({
@@ -127,7 +147,6 @@ export default function DeviceDetail() {
       return res.data;
     },
     enabled: activeTab === "alerts",
-    refetchInterval: 10000,
   });
 
   const { data: firewallData, isLoading: firewallLoading } = useQuery({
@@ -139,7 +158,6 @@ export default function DeviceDetail() {
       return res.data;
     },
     enabled: activeTab === "firewall",
-    refetchInterval: 10000,
   });
 
   const tabs = [
@@ -177,7 +195,7 @@ export default function DeviceDetail() {
   const primaryMac =
     device.macs && device.macs.length > 0 ? device.macs[0] : null;
   const currentLease = leasesData?.data?.find((l) => l.is_current);
-  const currentIp = currentLease?.ip_address || "-";
+  const currentIp = device?.ip_address || currentLease?.ip_address || "-";
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 font-sans flex flex-col">
@@ -288,20 +306,38 @@ export default function DeviceDetail() {
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded shadow-sm p-2 flex flex-wrap gap-2 items-center">
           <button
             onClick={() => setShowClassify(true)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded text-xs font-semibold transition-colors"
+            disabled={!can("device:classify")}
+            title={
+              can("device:classify")
+                ? undefined
+                : "Wymaga uprawnienia device:classify"
+            }
+            className="disabled:cursor-not-allowed disabled:opacity-40 flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded text-xs font-semibold transition-colors"
           >
             <Network className="w-4 h-4" /> Reklasyfikacja (Zmień VLAN)
           </button>
           <button
             onClick={() => setShowPsk(true)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
+            disabled={!can("device:psk:rotate")}
+            title={
+              can("device:psk:rotate")
+                ? undefined
+                : "Wymaga uprawnienia device:psk:rotate"
+            }
+            className="disabled:cursor-not-allowed disabled:opacity-40 flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
           >
             <Key className="w-4 h-4" />{" "}
             {device.has_psk ? "Rotacja PSK" : "Wydaj PSK"}
           </button>
           <button
             onClick={() => setShowStaticIp(true)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
+            disabled={!can("device:static_ip:manage")}
+            title={
+              can("device:static_ip:manage")
+                ? undefined
+                : "Wymaga uprawnienia device:static_ip:manage"
+            }
+            className="disabled:cursor-not-allowed disabled:opacity-40 flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded text-xs font-semibold transition-colors"
           >
             <Wifi className="w-4 h-4" /> Statyczne IP
           </button>
@@ -309,7 +345,13 @@ export default function DeviceDetail() {
           <div className="flex-1"></div>
           <button
             onClick={() => setShowDelete(true)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded text-xs font-semibold transition-colors border border-red-200 dark:border-red-900/50"
+            disabled={!can("device:delete")}
+            title={
+              can("device:delete")
+                ? undefined
+                : "Wymaga uprawnienia device:delete"
+            }
+            className="disabled:cursor-not-allowed disabled:opacity-40 flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded text-xs font-semibold transition-colors border border-red-200 dark:border-red-900/50"
           >
             <Trash2 className="w-4 h-4" /> Usuń urządzenie
           </button>
@@ -410,8 +452,20 @@ export default function DeviceDetail() {
                                     autoFocus
                                   />
                                   <button
-                                    onClick={() => setIsEditingName(false)}
-                                    className="text-green-600 p-1 hover:bg-green-50 rounded"
+                                    onClick={() =>
+                                      updateDevice.mutate(
+                                        { display_name: editNameValue },
+                                        {
+                                          onSuccess: () =>
+                                            setIsEditingName(false),
+                                        },
+                                      )
+                                    }
+                                    disabled={
+                                      updateDevice.isPending ||
+                                      !can("device:update")
+                                    }
+                                    className="text-green-600 p-1 hover:bg-green-50 rounded disabled:opacity-40"
                                   >
                                     <Save className="w-4 h-4" />
                                   </button>
@@ -541,11 +595,33 @@ export default function DeviceDetail() {
                     <textarea
                       className="w-full h-32 border border-gray-200 dark:border-gray-800 rounded bg-gray-50 dark:bg-gray-950 p-2 text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-blue-500 resize-none"
                       placeholder="Dodaj notatkę o tym urządzeniu..."
-                      defaultValue={device.notes || ""}
+                      value={notesDraft ?? device.notes ?? ""}
+                      onChange={(e) => setNotesDraft(e.target.value)}
                     ></textarea>
+                    {saveError && (
+                      <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                        {saveError}
+                      </p>
+                    )}
                     <div className="flex justify-end mt-2">
-                      <button className="px-3 py-1 bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded text-xs font-bold hover:bg-gray-300 transition-colors">
-                        Zapisz notatkę
+                      <button
+                        onClick={() =>
+                          updateDevice.mutate(
+                            { notes: notesDraft ?? "" },
+                            { onSuccess: () => setNotesDraft(null) },
+                          )
+                        }
+                        disabled={
+                          updateDevice.isPending ||
+                          !can("device:update") ||
+                          notesDraft === null ||
+                          notesDraft === (device.notes ?? "")
+                        }
+                        className="px-3 py-1 bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded text-xs font-bold hover:bg-gray-300 transition-colors disabled:opacity-40"
+                      >
+                        {updateDevice.isPending
+                          ? "Zapisuję..."
+                          : "Zapisz notatkę"}
                       </button>
                     </div>
                   </div>

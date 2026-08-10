@@ -16,6 +16,7 @@ import {
   KeyRound,
   AlertTriangle,
   Ban,
+  CircleCheck,
 } from "lucide-react";
 import { api } from "../api/client";
 import Sidebar from "../components/Sidebar";
@@ -115,7 +116,7 @@ export default function Users() {
       action,
     }: {
       userId: string;
-      action: "disable";
+      action: "disable" | "enable";
     }) => {
       const res = await api.post(`/users/${userId}/${action}`);
       return res.data;
@@ -193,16 +194,16 @@ export default function Users() {
 
   const handleToggleStatus = (
     userId: string,
-    currentStatus: boolean,
     username: string,
+    action: "disable" | "enable",
   ) => {
-    if (!currentStatus) return;
-    if (
-      window.confirm(
-        `Czy na pewno chcesz zablokować konto użytkownika ${username}?`,
-      )
-    ) {
-      toggleStatusMutation.mutate({ userId, action: "disable" });
+    const question =
+      action === "disable"
+        ? `Wyłączyć konto ${username}? Użytkownik straci możliwość zalogowania, a jego sesje zostaną zamknięte.`
+        : `Włączyć konto ${username}? Użytkownik znów będzie mógł się zalogować, a blokada po nieudanych próbach zostanie zdjęta.`;
+
+    if (window.confirm(question)) {
+      toggleStatusMutation.mutate({ userId, action });
     }
   };
 
@@ -556,110 +557,147 @@ export default function Users() {
                           </td>
                         </tr>
                       ) : (
-                        filteredUsers.map((user) => (
-                          <tr
-                            key={user.id}
-                            className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                          >
-                            <td className="px-6 py-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm uppercase">
-                                  {user.username?.charAt(0) || "?"}
-                                </div>
-                                <div>
-                                  <div className="font-bold text-gray-900 dark:text-white">
-                                    {user.full_name || user.username}
-                                  </div>
-                                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                                    {user.email || "@" + user.username}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-3">
-                              <span
-                                className={`px-2.5 py-1 rounded text-xs font-bold uppercase ${
-                                  user.role?.toLowerCase() === "owner" ||
-                                  user.role?.toLowerCase() === "admin"
-                                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400"
-                                    : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
-                                }`}
-                              >
-                                {user.role}
-                              </span>
-                            </td>
-                            <td className="px-6 py-3">
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`w-2 h-2 rounded-full ${!user.is_locked ? "bg-emerald-500" : "bg-red-500"}`}
-                                ></span>
-                                <span className="font-medium text-xs">
-                                  {!user.is_locked ? "Aktywny" : "Zablokowany"}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-3 text-center">
-                              {user.mfa_enabled ? (
-                                <ShieldCheck className="w-5 h-5 text-emerald-500 mx-auto" />
-                              ) : (
-                                <ShieldAlert className="w-5 h-5 text-orange-400 mx-auto opacity-50" />
-                              )}
-                            </td>
-                            <td className="px-6 py-3 text-xs text-gray-500 font-mono">
-                              {user.last_login_at
-                                ? new Date(user.last_login_at).toLocaleString()
-                                : "Nigdy"}
-                            </td>
-                            <td className="px-6 py-3">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() =>
-                                    setResetModalUser({
-                                      id: user.id as string,
-                                      username: user.username as string,
-                                    })
-                                  }
-                                  className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded transition-colors"
-                                  title="Reset hasła"
-                                >
-                                  <KeyRound className="w-4 h-4" />
-                                </button>
+                        filteredUsers.map((user) => {
+                          const isDisabled =
+                            (user.status || "").toLowerCase() === "disabled";
 
-                                {user.role?.toLowerCase() !== "owner" && (
-                                  <>
-                                    {!user.is_locked && (
+                          return (
+                            <tr
+                              key={user.id}
+                              className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                            >
+                              <td className="px-6 py-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm uppercase">
+                                    {user.username?.charAt(0) || "?"}
+                                  </div>
+                                  <div>
+                                    <div className="font-bold text-gray-900 dark:text-white">
+                                      {user.full_name || user.username}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {user.email || "@" + user.username}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-3">
+                                <span
+                                  className={`px-2.5 py-1 rounded text-xs font-bold uppercase ${
+                                    user.role?.toLowerCase() === "owner" ||
+                                    user.role?.toLowerCase() === "admin"
+                                      ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400"
+                                      : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                                  }`}
+                                >
+                                  {user.role}
+                                </span>
+                              </td>
+                              <td className="px-6 py-3">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`w-2 h-2 rounded-full ${
+                                      isDisabled
+                                        ? "bg-gray-400"
+                                        : user.is_locked
+                                          ? "bg-orange-500"
+                                          : "bg-emerald-500"
+                                    }`}
+                                  ></span>
+                                  <span className="font-medium text-xs">
+                                    {isDisabled
+                                      ? "Wyłączone"
+                                      : user.is_locked
+                                        ? "Zablokowane próbami"
+                                        : "Aktywne"}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-3 text-center">
+                                {user.mfa_enabled ? (
+                                  <ShieldCheck className="w-5 h-5 text-emerald-500 mx-auto" />
+                                ) : (
+                                  <ShieldAlert className="w-5 h-5 text-orange-400 mx-auto opacity-50" />
+                                )}
+                              </td>
+                              <td className="px-6 py-3 text-xs text-gray-500 font-mono">
+                                {user.last_login_at
+                                  ? new Date(
+                                      user.last_login_at,
+                                    ).toLocaleString()
+                                  : "Nigdy"}
+                              </td>
+                              <td className="px-6 py-3">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() =>
+                                      setResetModalUser({
+                                        id: user.id as string,
+                                        username: user.username as string,
+                                      })
+                                    }
+                                    className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded transition-colors"
+                                    title="Reset hasła"
+                                  >
+                                    <KeyRound className="w-4 h-4" />
+                                  </button>
+
+                                  {user.role?.toLowerCase() !== "owner" && (
+                                    <>
+                                      {isDisabled ? (
+                                        <button
+                                          onClick={() =>
+                                            handleToggleStatus(
+                                              user.id as string,
+                                              user.username as string,
+                                              "enable",
+                                            )
+                                          }
+                                          disabled={
+                                            toggleStatusMutation.isPending
+                                          }
+                                          className="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded transition-colors disabled:opacity-40"
+                                          title="Włącz konto"
+                                        >
+                                          <CircleCheck className="w-4 h-4" />
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() =>
+                                            handleToggleStatus(
+                                              user.id as string,
+                                              user.username as string,
+                                              "disable",
+                                            )
+                                          }
+                                          disabled={
+                                            toggleStatusMutation.isPending
+                                          }
+                                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-40"
+                                          title="Wyłącz konto"
+                                        >
+                                          <Ban className="w-4 h-4" />
+                                        </button>
+                                      )}
                                       <button
                                         onClick={() =>
-                                          handleToggleStatus(
+                                          handleDeleteUser(
                                             user.id as string,
-                                            true,
                                             user.username as string,
                                           )
                                         }
                                         className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                                        title="Zablokuj konto"
+                                        title="Usuń użytkownika"
                                       >
-                                        <Ban className="w-4 h-4" />
+                                        <Trash2 className="w-4 h-4" />
                                       </button>
-                                    )}
-                                    <button
-                                      onClick={() =>
-                                        handleDeleteUser(
-                                          user.id as string,
-                                          user.username as string,
-                                        )
-                                      }
-                                      className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                                      title="Usuń użytkownika"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>

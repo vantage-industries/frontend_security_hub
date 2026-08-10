@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api/client";
+import { useSession } from "./hooks/useSession";
 import type { definitions } from "./api/types";
 import Login from "./pages/Login";
 import Bootstrap from "./pages/Bootstrap";
@@ -18,6 +19,8 @@ import Policies from "./pages/Policies";
 type SetupStatusResponse = definitions["SetupStatusResponse"];
 
 export default function App() {
+  const { isAuthenticated, isLoading: sessionLoading } = useSession();
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["setup-status"],
     queryFn: async () => {
@@ -27,7 +30,7 @@ export default function App() {
     retry: false,
   });
 
-  if (isLoading) {
+  if (isLoading || sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 text-gray-800 dark:text-white">
         Ładowanie...
@@ -44,7 +47,6 @@ export default function App() {
   }
 
   const setupRequired = data?.setup_required;
-  const isAuthenticated = !!localStorage.getItem("csrf_token");
 
   return (
     <BrowserRouter>
@@ -67,7 +69,7 @@ export default function App() {
             isAuthenticated && !setupRequired ? (
               <Devices />
             ) : (
-              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
             )
           }
         />
@@ -77,7 +79,7 @@ export default function App() {
             isAuthenticated && !setupRequired ? (
               <DeviceDetail />
             ) : (
-              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
             )
           }
         />
@@ -93,7 +95,13 @@ export default function App() {
         />
         <Route
           path="/dashboard"
-          element={isAuthenticated ? <Dashboard /> : <Navigate to="/" />}
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Dashboard />
+            ) : (
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
+            )
+          }
         />
         <Route
           path="/account"
@@ -101,7 +109,7 @@ export default function App() {
             isAuthenticated && !setupRequired ? (
               <Account />
             ) : (
-              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
             )
           }
         />
@@ -111,7 +119,7 @@ export default function App() {
             isAuthenticated && !setupRequired ? (
               <Users />
             ) : (
-              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
             )
           }
         />
@@ -121,7 +129,7 @@ export default function App() {
             isAuthenticated && !setupRequired ? (
               <Quarantine />
             ) : (
-              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
             )
           }
         />
@@ -131,7 +139,7 @@ export default function App() {
             isAuthenticated && !setupRequired ? (
               <Settings />
             ) : (
-              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
             )
           }
         />
@@ -141,7 +149,7 @@ export default function App() {
             isAuthenticated && !setupRequired ? (
               <Onboarding />
             ) : (
-              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
             )
           }
         />
@@ -151,7 +159,7 @@ export default function App() {
             isAuthenticated && !setupRequired ? (
               <Vlans />
             ) : (
-              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
             )
           }
         />
@@ -161,10 +169,11 @@ export default function App() {
             isAuthenticated && !setupRequired ? (
               <Policies />
             ) : (
-              <Navigate to={setupRequired ? "/setup" : "/login"} replace />
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
             )
           }
         />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

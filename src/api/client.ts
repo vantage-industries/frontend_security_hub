@@ -35,7 +35,7 @@ api.interceptors.response.use(
 
       if (status === 401 && !isAuthEndpoint) {
         const currentPath = window.location.pathname;
-        if (currentPath !== "/login" && currentPath !== "/setup") {
+        if (currentPath !== "/login" && currentPath !== "/bootstrap") {
           localStorage.removeItem("csrf_token");
           window.location.href = "/login";
         }
