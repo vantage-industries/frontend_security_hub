@@ -19,6 +19,7 @@ const Vlans = lazy(() => import("./pages/Vlans"));
 const Policies = lazy(() => import("./pages/Policies"));
 const Firewall = lazy(() => import("./pages/Firewall"));
 const Diagnostics = lazy(() => import("./pages/Diagnostics"));
+const Sessions = lazy(() => import("./pages/Sessions"));
 
 type SetupStatusResponse = definitions["SetupStatusResponse"];
 
@@ -236,6 +237,19 @@ export default function App() {
             element={
               isAuthenticated && !setupRequired ? (
                 <Diagnostics />
+              ) : (
+                <Navigate
+                  to={setupRequired ? "/bootstrap" : "/login"}
+                  replace
+                />
+              )
+            }
+          />
+          <Route
+            path="/sessions"
+            element={
+              isAuthenticated && !setupRequired ? (
+                <Sessions />
               ) : (
                 <Navigate
                   to={setupRequired ? "/bootstrap" : "/login"}

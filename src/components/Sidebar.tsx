@@ -16,6 +16,7 @@ import {
   User,
   Settings,
   Stethoscope,
+  MonitorSmartphone,
 } from "lucide-react";
 
 type ListResponseDevice =
@@ -45,6 +46,7 @@ const mainNav: NavItem[] = [
 
 const bottomNav: NavItem[] = [
   { to: "/account", label: "Moje konto", icon: User },
+  { to: "/sessions", label: "Aktywne sesje", icon: MonitorSmartphone },
   { to: "/diagnostics", label: "Diagnostyka", icon: Stethoscope },
   { to: "/settings", label: "Ustawienia systemu", icon: Settings },
 ];

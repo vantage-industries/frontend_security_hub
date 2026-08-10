@@ -67,7 +67,7 @@ export default function Dashboard() {
   });
 
   const { data: pendingDevices } = useQuery({
-    queryKey: ["onboarding-pending"],
+    queryKey: ["onboarding-pending", "count"],
     queryFn: async () => {
       const res = await api.get<ListResponseDevice>(
         "/onboarding/pending?limit=1",
@@ -137,7 +137,7 @@ export default function Dashboard() {
               <Menu className="w-6 h-6" />
             </button>
             <h1 className="text-lg font-semibold text-gray-800 dark:text-white">
-              Dashboard (Status)
+              Przegląd
             </h1>
           </div>
 
@@ -174,14 +174,14 @@ export default function Dashboard() {
             >
               <div className="flex items-center justify-between mb-2 opacity-90">
                 <span className="text-sm font-medium uppercase tracking-wider">
-                  Aktywne Urządzenia
+                  Aktywne urządzenia
                 </span>
                 <Activity className="w-5 h-5" />
               </div>
               <div className="text-3xl font-bold">
                 {statusLoading ? "..." : status?.counts?.active_devices || 0}
                 <span className="text-sm font-normal opacity-70 ml-2">
-                  / {status?.counts?.devices || 0} total
+                  / {status?.counts?.devices || 0} łącznie
                 </span>
               </div>
             </Link>
@@ -206,7 +206,7 @@ export default function Dashboard() {
             >
               <div className="flex items-center justify-between mb-2 opacity-90">
                 <span className="text-sm font-medium uppercase tracking-wider">
-                  Niepotw. Alerty
+                  Alerty bez reakcji
                 </span>
                 <ShieldAlert className="w-5 h-5" />
               </div>
@@ -220,7 +220,7 @@ export default function Dashboard() {
             <div className="bg-[#8e24aa] p-4 rounded shadow-sm flex flex-col justify-between">
               <div className="flex items-center justify-between mb-2 opacity-90">
                 <span className="text-sm font-medium uppercase tracking-wider">
-                  Uptime Systemu
+                  Czas pracy
                 </span>
                 <Clock className="w-5 h-5" />
               </div>
@@ -229,6 +229,23 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {status?.preflight && status.preflight.ready === false && (
+            <Link
+              to="/diagnostics"
+              className="mb-4 flex items-center justify-between rounded border-l-4 border-red-500 bg-white p-4 shadow-sm transition-colors hover:bg-red-50 dark:bg-gray-900 dark:hover:bg-red-950/20"
+            >
+              <div>
+                <h3 className="text-sm font-bold text-red-700 dark:text-red-400">
+                  Środowisko nie jest gotowe
+                </h3>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Część kontroli startowych nie przeszła, więc hub może nie
+                  zarządzać ruchem. Zobacz diagnostykę.
+                </p>
+              </div>
+            </Link>
+          )}
 
           {hasActions && (
             <div className="bg-white dark:bg-gray-900 border-l-4 border-orange-500 rounded shadow-sm p-4 mb-4 flex items-center justify-between">
@@ -240,14 +257,20 @@ export default function Dashboard() {
                   </h3>
                   <div className="text-xs text-gray-500 flex gap-4 mt-1 font-medium">
                     {(pendingDevices?.total || 0) > 0 && (
-                      <span className="text-orange-600 cursor-pointer hover:underline">
-                        {pendingDevices?.total} urz. oczekuje na Onboarding
-                      </span>
+                      <Link
+                        to="/onboarding"
+                        className="text-orange-600 hover:underline"
+                      >
+                        {pendingDevices?.total} urządzeń czeka na przydział
+                      </Link>
                     )}
                     {quarantined > 0 && (
-                      <span className="text-red-600 cursor-pointer hover:underline">
-                        {quarantined} urz. w Kwarantannie
-                      </span>
+                      <Link
+                        to="/quarantine"
+                        className="text-red-600 hover:underline"
+                      >
+                        {quarantined} w kwarantannie
+                      </Link>
                     )}
                   </div>
                 </div>
@@ -263,11 +286,11 @@ export default function Dashboard() {
 
           <div className="bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-800 p-3 mb-4">
             <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Network className="w-4 h-4" /> Segmenty Sieci (VLAN)
+              <Network className="w-4 h-4" /> Segmenty sieci
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2">
               {vlansData?.data?.map((vlan) => {
-                const isNotDeployed = vlan.vid === 99 || !vlan.is_deployed;
+                const isNotDeployed = !vlan.is_deployed;
                 return (
                   <Link
                     to="/vlans"
@@ -282,7 +305,7 @@ export default function Dashboard() {
                       </span>
                       {isNotDeployed && (
                         <span className="text-[10px] bg-gray-200 text-gray-500 px-1 rounded dark:bg-gray-700">
-                          Not Deployed
+                          Niewdrożony
                         </span>
                       )}
                     </div>
@@ -302,11 +325,14 @@ export default function Dashboard() {
             <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col">
               <div className="p-3 bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700 flex justify-between items-center">
                 <h2 className="text-sm font-bold text-gray-700 dark:text-gray-200">
-                  Log Zdarzeń Bezpieczeństwa (IDS)
+                  Zdarzenia bezpieczeństwa
                 </h2>
-                <button className="text-xs text-blue-600 hover:underline dark:text-blue-400">
-                  Zobacz wszystko
-                </button>
+                <Link
+                  to="/quarantine"
+                  className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  Kwarantanna
+                </Link>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-gray-600 dark:text-gray-300">
@@ -316,16 +342,16 @@ export default function Dashboard() {
                         Czas
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
-                        Severity
+                        Waga
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
                         Sygnatura
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
-                        Urządzenie (Src)
+                        Źródło
                       </th>
                       <th className="px-4 py-2 border-b dark:border-gray-700">
-                        Port Dst
+                        Port docelowy
                       </th>
                     </tr>
                   </thead>
@@ -384,7 +410,7 @@ export default function Dashboard() {
               <div className="bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-800">
                 <div className="p-3 bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
                   <h2 className="text-sm font-bold text-gray-700 dark:text-gray-200">
-                    Stan Komponentów
+                    Stan komponentów
                   </h2>
                 </div>
                 <div className="p-4 space-y-3">
@@ -392,41 +418,41 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2">
                       <Server className="w-4 h-4 text-gray-400" />
                       <span className="font-medium text-gray-700 dark:text-gray-300">
-                        Baza Danych
+                        Baza danych
                       </span>
                     </div>
                     <span
                       className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${status?.database?.ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
                     >
-                      {status?.database?.ok ? "OK" : "Error"}
+                      {status?.database?.ok ? "Sprawna" : "Błąd"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <Wifi className="w-4 h-4 text-gray-400" />
                       <span className="font-medium text-gray-700 dark:text-gray-300">
-                        HostAPD (Radio)
+                        Punkt dostępowy
                       </span>
                     </div>
                     <span
                       className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${status?.services?.hostapd_ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
                     >
-                      {status?.services?.hostapd_ok ? "Running" : "Down"}
+                      {status?.services?.hostapd_ok ? "Działa" : "Nie działa"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <ShieldBan className="w-4 h-4 text-gray-400" />
                       <span className="font-medium text-gray-700 dark:text-gray-300">
-                        Suricata IDS
+                        Wykrywanie włamań
                       </span>
                     </div>
                     <span
                       className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${status?.services?.suricata?.running ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
                     >
                       {status?.services?.suricata?.running
-                        ? "Active"
-                        : "Disabled"}
+                        ? "Działa"
+                        : "Wyłączone"}
                     </span>
                   </div>
                 </div>
@@ -435,7 +461,7 @@ export default function Dashboard() {
               <div className="bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col flex-1">
                 <div className="p-3 bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
                   <h2 className="text-sm font-bold text-gray-700 dark:text-gray-200">
-                    Urządzenia (Podział)
+                    Podział urządzeń
                   </h2>
                 </div>
                 <div className="p-2 flex-1 min-h-[200px]">
