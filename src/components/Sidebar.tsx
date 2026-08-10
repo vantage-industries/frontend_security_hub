@@ -11,9 +11,11 @@ import {
   Wifi,
   Network,
   ShieldCheck,
+  Flame,
   Users,
   User,
   Settings,
+  Stethoscope,
 } from "lucide-react";
 
 type ListResponseDevice =
@@ -37,11 +39,13 @@ const mainNav: NavItem[] = [
   { to: "/devices", label: "Urządzenia", icon: Wifi },
   { to: "/vlans", label: "Segmenty sieci", icon: Network },
   { to: "/policies", label: "Profile polityk", icon: ShieldCheck },
+  { to: "/firewall", label: "Firewall", icon: Flame },
   { to: "/users", label: "Użytkownicy", icon: Users },
 ];
 
 const bottomNav: NavItem[] = [
   { to: "/account", label: "Moje konto", icon: User },
+  { to: "/diagnostics", label: "Diagnostyka", icon: Stethoscope },
   { to: "/settings", label: "Ustawienia systemu", icon: Settings },
 ];
 

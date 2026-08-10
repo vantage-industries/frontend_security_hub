@@ -15,6 +15,8 @@ import Settings from "./pages/Settings";
 import Onboarding from "./pages/Onboarding";
 import Vlans from "./pages/Vlans";
 import Policies from "./pages/Policies";
+import Firewall from "./pages/Firewall";
+import Diagnostics from "./pages/Diagnostics";
 
 type SetupStatusResponse = definitions["SetupStatusResponse"];
 
@@ -168,6 +170,26 @@ export default function App() {
           element={
             isAuthenticated && !setupRequired ? (
               <Policies />
+            ) : (
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
+            )
+          }
+        />
+        <Route
+          path="/firewall"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Firewall />
+            ) : (
+              <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
+            )
+          }
+        />
+        <Route
+          path="/diagnostics"
+          element={
+            isAuthenticated && !setupRequired ? (
+              <Diagnostics />
             ) : (
               <Navigate to={setupRequired ? "/bootstrap" : "/login"} replace />
             )
