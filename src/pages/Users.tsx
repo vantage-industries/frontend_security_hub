@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import Sidebar from "../components/Sidebar";
+import { useSession } from "../hooks/useSession";
 import type { definitions } from "../api/types";
 
 //type User = definitions["User"];
@@ -69,6 +70,8 @@ export default function Users() {
       !!sessionData &&
       (sessionData.role === "owner" || sessionData.role === "admin"),
   });
+
+  const { can } = useSession();
 
   const addUserMutation = useMutation({
     mutationFn: async (payload: definitions["CreateUserRequest"]) => {
@@ -509,13 +512,15 @@ export default function Users() {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Dodaj użytkownika
-                </button>
+                {can("user:write") && (
+                  <button
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Dodaj użytkownika
+                  </button>
+                )}
               </div>
 
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm overflow-hidden flex flex-col min-h-[500px]">
@@ -636,8 +641,13 @@ export default function Users() {
                                         username: user.username as string,
                                       })
                                     }
-                                    className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded transition-colors"
-                                    title="Reset hasła"
+                                    disabled={!can("user:write")}
+                                    className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                                    title={
+                                      can("user:write")
+                                        ? "Reset hasła"
+                                        : "Wymaga uprawnienia user:write"
+                                    }
                                   >
                                     <KeyRound className="w-4 h-4" />
                                   </button>
@@ -654,7 +664,8 @@ export default function Users() {
                                             )
                                           }
                                           disabled={
-                                            toggleStatusMutation.isPending
+                                            toggleStatusMutation.isPending ||
+                                            !can("user:write")
                                           }
                                           className="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded transition-colors disabled:opacity-40"
                                           title="Włącz konto"
@@ -671,7 +682,8 @@ export default function Users() {
                                             )
                                           }
                                           disabled={
-                                            toggleStatusMutation.isPending
+                                            toggleStatusMutation.isPending ||
+                                            !can("user:write")
                                           }
                                           className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-40"
                                           title="Wyłącz konto"
@@ -686,8 +698,13 @@ export default function Users() {
                                             user.username as string,
                                           )
                                         }
-                                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                                        title="Usuń użytkownika"
+                                        disabled={!can("user:delete")}
+                                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                                        title={
+                                          can("user:delete")
+                                            ? "Usuń użytkownika"
+                                            : "Wymaga uprawnienia user:delete"
+                                        }
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </button>

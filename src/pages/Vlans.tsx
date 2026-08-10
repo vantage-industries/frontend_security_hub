@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import Sidebar from "../components/Sidebar";
+import { useSession } from "../hooks/useSession";
 import type { definitions } from "../api/types";
 
 type VLAN = definitions["VLAN"];
@@ -54,6 +55,8 @@ export default function Vlans() {
       return res.data;
     },
   });
+
+  const { can } = useSession();
 
   const updateVlanMutation = useMutation({
     mutationFn: async ({
@@ -337,7 +340,13 @@ export default function Vlans() {
                               ) : (
                                 <button
                                   onClick={() => handleEditClick(vlan)}
-                                  className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                  disabled={!can("vlan:update")}
+                                  title={
+                                    can("vlan:update")
+                                      ? undefined
+                                      : "Wymaga uprawnienia vlan:update"
+                                  }
+                                  className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                   <Edit2 className="w-4 h-4" />
                                 </button>
