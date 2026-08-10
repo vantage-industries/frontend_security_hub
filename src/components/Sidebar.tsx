@@ -58,7 +58,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
   const { pathname } = useLocation();
 
   const { data: pending } = useQuery({
-    queryKey: ["onboarding-pending"],
+    queryKey: ["onboarding-pending", "count"],
     queryFn: async () => {
       const res = await api.get<ListResponseDevice>(
         "/onboarding/pending?limit=1",

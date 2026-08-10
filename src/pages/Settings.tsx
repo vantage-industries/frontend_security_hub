@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import Sidebar from "../components/Sidebar";
+import { useSession } from "../hooks/useSession";
 import type { definitions } from "../api/types";
 
 type WiFiSettings = definitions["WiFiSettings"];
@@ -78,6 +79,8 @@ export default function Settings() {
       });
     }
   }, [wifiData]);
+
+  const { can } = useSession();
 
   const updateWifiMutation = useMutation({
     mutationFn: async (payload: UpdateWiFiRequest) => {
@@ -512,7 +515,14 @@ export default function Settings() {
                     <div className="pt-4 border-t border-gray-200 dark:border-gray-800 flex justify-end">
                       <button
                         type="submit"
-                        disabled={updateWifiMutation.isPending}
+                        title={
+                          can("wifi:update")
+                            ? undefined
+                            : "Wymaga uprawnienia wifi:update"
+                        }
+                        disabled={
+                          updateWifiMutation.isPending || !can("wifi:update")
+                        }
                         className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
                       >
                         {updateWifiMutation.isPending
@@ -540,7 +550,13 @@ export default function Settings() {
                   </div>
                   <button
                     onClick={() => setReauthModalType("reboot")}
-                    className="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 dark:text-orange-400 rounded-lg text-sm font-bold transition-colors"
+                    disabled={!can("system:reboot")}
+                    title={
+                      can("system:reboot")
+                        ? undefined
+                        : "Wymaga uprawnienia system:reboot"
+                    }
+                    className="disabled:cursor-not-allowed disabled:opacity-40 px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 dark:text-orange-400 rounded-lg text-sm font-bold transition-colors"
                   >
                     Uruchom ponownie
                   </button>
@@ -567,7 +583,13 @@ export default function Settings() {
                     </div>
                     <button
                       onClick={() => setReauthModalType("factory-reset")}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-colors shadow-sm"
+                      disabled={!can("system:factory_reset")}
+                      title={
+                        can("system:factory_reset")
+                          ? undefined
+                          : "Wymaga uprawnienia system:factory_reset — tylko właściciel"
+                      }
+                      className="disabled:cursor-not-allowed disabled:opacity-40 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-colors shadow-sm"
                     >
                       Przywróć ustawienia fabryczne
                     </button>

@@ -273,7 +273,7 @@ export default function Quarantine() {
                     <tr>
                       <th className="px-6 py-4">Urządzenie / Hostname</th>
                       <th className="px-6 py-4">Powód kwarantanny</th>
-                      <th className="px-6 py-4">Data dodania</th>
+                      <th className="px-6 py-4">W kwarantannie od</th>
                       <th className="px-6 py-4 text-right">Akcje</th>
                     </tr>
                   </thead>
@@ -334,9 +334,16 @@ export default function Quarantine() {
                               </span>
                             </td>
                             <td className="px-6 py-3 text-xs text-gray-500 font-mono">
-                              {dev.classified_at
-                                ? new Date(dev.classified_at).toLocaleString()
-                                : "-"}
+                              {dev.classified_at || dev.first_seen ? (
+                                new Date(
+                                  (dev.classified_at ||
+                                    dev.first_seen) as string,
+                                ).toLocaleString()
+                              ) : (
+                                <span className="font-sans">
+                                  jeszcze się nie zgłosiło
+                                </span>
+                              )}
                             </td>
                             <td className="px-6 py-3 text-right">
                               <button

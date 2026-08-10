@@ -74,8 +74,8 @@ export default function CredentialReveal({
     <>
       <div className="max-h-[70vh] space-y-4 overflow-y-auto p-4">
         <div className="rounded border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-          {credential.warning ||
-            "Ten klucz nie zostanie pokazany ponownie. Zapisz go teraz."}
+          Ten klucz jest pokazywany raz i nie jest nigdzie zapisywany.
+          Skonfiguruj urządzenie teraz albo wydaj klucz od nowa.
         </div>
 
         {!isSynced && (

@@ -14,7 +14,7 @@ export default function AddDeviceButton() {
   const { can } = useSession();
 
   const { data: pending } = useQuery({
-    queryKey: ["onboarding-pending"],
+    queryKey: ["onboarding-pending", "count"],
     queryFn: async () => {
       const res = await api.get<ListResponseDevice>(
         "/onboarding/pending?limit=1",
