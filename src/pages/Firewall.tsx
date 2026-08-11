@@ -18,6 +18,7 @@ import {
 import { api } from "../api/client";
 import Sidebar from "../components/Sidebar";
 import { useSession } from "../hooks/useSession";
+import FirewallRuleDialog from "../components/FirewallRuleDialog";
 import type { definitions } from "../api/types";
 
 type FirewallStatusResponse = definitions["FirewallStatusResponse"];
@@ -56,6 +57,7 @@ export default function Firewall() {
   const [applied, setApplied] = useState<number | null>(null);
   const [rollbackTo, setRollbackTo] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [showRuleDialog, setShowRuleDialog] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const { data: status } = useQuery({
@@ -218,19 +220,34 @@ export default function Firewall() {
                 </p>
               </div>
 
-              <button
-                onClick={() => applyMutation.mutate()}
-                disabled={!can("firewall:apply") || applyMutation.isPending}
-                title={
-                  can("firewall:apply")
-                    ? undefined
-                    : "Wymaga uprawnienia firewall:apply"
-                }
-                className="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ShieldCheck className="h-4 w-4" />
-                {applyMutation.isPending ? "Stosuję..." : "Zastosuj reguły"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowRuleDialog(true)}
+                  disabled={!can("firewall:rule:write")}
+                  title={
+                    can("firewall:rule:write")
+                      ? undefined
+                      : "Wymaga uprawnienia firewall:rule:write"
+                  }
+                  className="rounded bg-gray-100 px-4 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  Nowa reguła
+                </button>
+
+                <button
+                  onClick={() => applyMutation.mutate()}
+                  disabled={!can("firewall:apply") || applyMutation.isPending}
+                  title={
+                    can("firewall:apply")
+                      ? undefined
+                      : "Wymaga uprawnienia firewall:apply"
+                  }
+                  className="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  {applyMutation.isPending ? "Stosuję..." : "Zastosuj reguły"}
+                </button>
+              </div>
             </div>
 
             {!inSync && (
@@ -491,6 +508,10 @@ export default function Firewall() {
           </div>
         </main>
       </div>
+
+      {showRuleDialog && (
+        <FirewallRuleDialog onClose={() => setShowRuleDialog(false)} />
+      )}
     </div>
   );
 }
