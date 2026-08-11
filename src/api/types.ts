@@ -2974,6 +2974,11 @@ export interface definitions {
   EnrollDeviceRequest: {
     display_name: string;
     mac?: string;
+    /**
+     * @description NeedsInternetForSetup grants a timed window in quarantine when the device first connects,
+     * for hardware that cannot complete its own pairing without reaching a vendor cloud.
+     */
+    needs_internet_for_setup?: boolean;
     notes?: string;
     psk?: string;
   };
@@ -3261,6 +3266,11 @@ export interface definitions {
     generation: number;
   };
   RotatePSKRequest: {
+    /**
+     * @description NeedsInternetForSetup re-arms the startup window: a factory-reset device being re-paired
+     * has the same first-run need as a new one.
+     */
+    needs_internet_for_setup?: boolean;
     psk?: string;
   };
   ServiceHealth: {

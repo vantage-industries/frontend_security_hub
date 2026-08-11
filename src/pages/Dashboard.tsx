@@ -13,14 +13,6 @@ import {
   Clock,
   Network,
 } from "lucide-react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-} from "recharts";
 import { api } from "../api/client";
 import Sidebar from "../components/Sidebar";
 import type { definitions } from "../api/types";
@@ -109,14 +101,10 @@ export default function Dashboard() {
     (status?.counts?.active_devices || 0) - (status?.counts?.quarantined || 0);
   const quarantined = status?.counts?.quarantined || 0;
 
-  const deviceChartData = [
-    {
-      name: "Bezpieczne",
-      value: activeSafe > 0 ? activeSafe : 0,
-      color: "#10b981",
-    },
-    { name: "Kwarantanna", value: quarantined, color: "#ef4444" },
-  ];
+  const safeCount = activeSafe > 0 ? activeSafe : 0;
+  const chartTotal = safeCount + quarantined;
+  const safePercent =
+    chartTotal > 0 ? Math.round((safeCount / chartTotal) * 100) : 0;
 
   const hasActions =
     (pendingDevices?.total || 0) > 0 ||
@@ -464,43 +452,53 @@ export default function Dashboard() {
                     Podział urządzeń
                   </h2>
                 </div>
-                <div className="p-2 flex-1 min-h-[200px]">
+                <div className="p-4 flex-1 min-h-[200px] flex flex-col justify-center gap-4">
                   {statusLoading ? (
                     <div className="flex items-center justify-center h-full text-xs text-gray-500">
                       Ładowanie...
                     </div>
+                  ) : chartTotal === 0 ? (
+                    <div className="flex items-center justify-center h-full text-xs text-gray-500">
+                      Brak aktywnych urządzeń.
+                    </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={deviceChartData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={70}
-                          paddingAngle={2}
-                          dataKey="value"
-                          stroke="none"
-                        >
-                          {deviceChartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: isDarkMode ? "#1f2937" : "#ffffff",
-                            fontSize: "12px",
-                            padding: "4px 8px",
-                          }}
+                    <>
+                      <div className="flex h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+                        <div
+                          className="bg-emerald-500"
+                          style={{ width: `${safePercent}%` }}
                         />
-                        <Legend
-                          verticalAlign="bottom"
-                          height={24}
-                          iconSize={10}
-                          wrapperStyle={{ fontSize: "12px" }}
+                        <div
+                          className="bg-red-500"
+                          style={{ width: `${100 - safePercent}%` }}
                         />
-                      </PieChart>
-                    </ResponsiveContainer>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                            Bezpieczne
+                          </span>
+                          <span className="font-mono font-bold text-gray-800 dark:text-gray-100">
+                            {safeCount}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                            W kwarantannie
+                          </span>
+                          <span className="font-mono font-bold text-gray-800 dark:text-gray-100">
+                            {quarantined}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                        {safePercent}% urządzeń bez zastrzeżeń
+                      </p>
+                    </>
                   )}
                 </div>
               </div>
