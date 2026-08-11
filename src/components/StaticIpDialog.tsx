@@ -198,8 +198,10 @@ export default function StaticIpDialog({ device, deviceId, onClose }: Props) {
 
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Rezerwacja zacznie obowiązywać przy następnym odnowieniu dzierżawy.
-            Żeby zadziałała od razu, urządzenie musi się rozłączyć i połączyć
-            ponownie.
+            Jeśli adres nie zadziała mimo ponownego połączenia urządzenia,
+            sprawdź Diagnostykę — bez uprawnienia CAP_KILL hub nie powiadomi
+            dnsmasqa o zmianie i nowy adres wejdzie w życie dopiero po jego
+            restarcie.
           </p>
 
           {error && (
