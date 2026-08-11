@@ -12,6 +12,7 @@ import {
   Network,
   ShieldCheck,
   Flame,
+  Globe,
   Users,
   User,
   Settings,
@@ -41,6 +42,7 @@ const mainNav: NavItem[] = [
   { to: "/vlans", label: "Segmenty sieci", icon: Network },
   { to: "/policies", label: "Profile polityk", icon: ShieldCheck },
   { to: "/firewall", label: "Firewall", icon: Flame },
+  { to: "/dns", label: "Ruch DNS", icon: Globe },
   { to: "/users", label: "Użytkownicy", icon: Users },
 ];
 

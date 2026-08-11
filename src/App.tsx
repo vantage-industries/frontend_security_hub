@@ -20,6 +20,7 @@ const Policies = lazy(() => import("./pages/Policies"));
 const Firewall = lazy(() => import("./pages/Firewall"));
 const Diagnostics = lazy(() => import("./pages/Diagnostics"));
 const Sessions = lazy(() => import("./pages/Sessions"));
+const DnsDomains = lazy(() => import("./pages/DnsDomains"));
 
 type SetupStatusResponse = definitions["SetupStatusResponse"];
 
@@ -250,6 +251,19 @@ export default function App() {
             element={
               isAuthenticated && !setupRequired ? (
                 <Sessions />
+              ) : (
+                <Navigate
+                  to={setupRequired ? "/bootstrap" : "/login"}
+                  replace
+                />
+              )
+            }
+          />
+          <Route
+            path="/dns"
+            element={
+              isAuthenticated && !setupRequired ? (
+                <DnsDomains />
               ) : (
                 <Navigate
                   to={setupRequired ? "/bootstrap" : "/login"}
