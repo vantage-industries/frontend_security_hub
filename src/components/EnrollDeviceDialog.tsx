@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { api } from "../api/client";
 import type { definitions } from "../api/types";
 import CredentialReveal from "./CredentialReveal";
+import { useSession } from "../hooks/useSession";
 
 type CredentialResponse = definitions["CredentialResponse"];
 type EnrollDeviceRequest = definitions["EnrollDeviceRequest"];
@@ -36,15 +37,19 @@ const macPattern = /^(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}$|^[0-9a-f]{12}$/i;
 export default function EnrollDeviceDialog({ onClose }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { can } = useSession();
 
   const [displayName, setDisplayName] = useState("");
   const [mac, setMac] = useState("");
   const [notes, setNotes] = useState("");
   const [useOwnPsk, setUseOwnPsk] = useState(false);
+  const [grantInternet, setGrantInternet] = useState(false);
+  const [setupMinutes, setSetupMinutes] = useState(60);
   const [psk, setPsk] = useState("");
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [windowWarning, setWindowWarning] = useState<string | null>(null);
   const [credential, setCredential] = useState<CredentialResponse | null>(null);
 
   const enroll = useMutation({
@@ -55,11 +60,27 @@ export default function EnrollDeviceDialog({ onClose }: Props) {
       );
       return res.data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setCredential(data);
       queryClient.invalidateQueries({ queryKey: ["devices"] });
       queryClient.invalidateQueries({ queryKey: ["onboarding-pending"] });
       queryClient.invalidateQueries({ queryKey: ["system-status"] });
+
+      if (grantInternet && data.device?.id) {
+        try {
+          await api.post(`/devices/${data.device.id}/internet-window`, {
+            minutes: setupMinutes,
+          });
+        } catch (err) {
+          const body = (
+            err as { response?: { data?: { error?: { message?: string } } } }
+          )?.response?.data?.error;
+          setWindowWarning(
+            body?.message ||
+              "Urządzenie dodano, ale nie udało się otworzyć okna internetowego. Możesz je otworzyć z karty urządzenia.",
+          );
+        }
+      }
     },
     onError: (err: unknown) => {
       const body = (err as ApiError)?.response?.data?.error;
@@ -163,6 +184,20 @@ export default function EnrollDeviceDialog({ onClose }: Props) {
             onDone={onClose}
             note={
               <div className="space-y-2 rounded bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-950 dark:text-gray-400">
+                {windowWarning && (
+                  <p className="rounded bg-amber-100 px-2 py-1.5 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                    {windowWarning}
+                  </p>
+                )}
+                {grantInternet && !windowWarning && (
+                  <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+                    Dostęp do internetu otwarty na{" "}
+                    {setupMinutes < 60
+                      ? `${setupMinutes} min`
+                      : `${setupMinutes / 60} h`}
+                    .
+                  </p>
+                )}
                 <p>
                   Urządzenie czeka teraz w kwarantannie na pierwsze połączenie.
                   Wpisz ten klucz w sprzęcie albo zeskanuj kod.
@@ -289,6 +324,53 @@ export default function EnrollDeviceDialog({ onClose }: Props) {
                   </p>
                 )}
               </div>
+
+              {can("device:internet_window:grant") && (
+                <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                  <label className="flex items-start gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={grantInternet}
+                      onChange={(e) => setGrantInternet(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    Dostęp do internetu na czas konfiguracji
+                  </label>
+
+                  {grantInternet ? (
+                    <div className="mt-3">
+                      <div className="flex gap-2">
+                        {[15, 60, 240].map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setSetupMinutes(preset)}
+                            className={`flex-1 rounded border px-3 py-2 text-xs font-bold transition-colors ${
+                              setupMinutes === preset
+                                ? "border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                            }`}
+                          >
+                            {preset < 60 ? `${preset} min` : `${preset / 60} h`}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        Okno zamknie się samo i nie zostanie w konfiguracji.
+                        Urządzenie przez ten czas jest w kwarantannie, więc
+                        dostaje wyłącznie ruch wychodzący.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      Wiele sprzętów przy pierwszym uruchomieniu musi pobrać
+                      aktualizację albo połączyć się z chmurą producenta. Bez
+                      tego okna nie zrobi tego, dopóki nie przydzielisz go do
+                      segmentu.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {formError && (
                 <p className="rounded bg-red-100 px-3 py-2 text-xs text-red-700 dark:bg-red-950/50 dark:text-red-300">
