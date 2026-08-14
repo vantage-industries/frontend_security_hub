@@ -10,6 +10,10 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { api } from "../api/client";
+import type { definitions } from "../api/types";
+
+type LoginRequest = definitions["LoginRequest"];
+type LoginResponse = definitions["LoginResponse"];
 
 export default function Login() {
   const [step, setStep] = useState<"credentials" | "totp">("credentials");
@@ -21,43 +25,54 @@ export default function Login() {
   const [loginError, setLoginError] = useState("");
 
   const loginMutation = useMutation({
-    mutationFn: (payload: any) => api.post("/auth/login", payload),
+    mutationFn: async (payload: LoginRequest) => {
+      const res = await api.post<LoginResponse>("/auth/login", payload);
+      return res.data;
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
 
-    const payload: any = {
+    const payload: LoginRequest = {
       username: formData.username,
       password: formData.password,
     };
-    if (step === "totp") {
+    if (step === "totp" && formData.totp_code) {
       payload.totp_code = formData.totp_code;
     }
 
     loginMutation.mutate(payload, {
-      onSuccess: (res) => {
-        const data = res.data;
-        const serverError = data?.error || data?.message;
-
-        if (serverError) {
-          const errStr = String(serverError).toLowerCase();
-          if (errStr.includes("totp") || errStr.includes("2fa")) {
-            setStep("totp");
-          } else {
-            setLoginError("Błędny login lub hasło.");
-          }
+      onSuccess: (data) => {
+        if (data.mfa_required) {
+          setStep("totp");
+          setFormData((previous) => ({ ...previous, totp_code: "" }));
           return;
         }
 
-        const tokenToSave =
-          data?.token || data?.access_token || "session_active";
-        localStorage.setItem("csrf_token", tokenToSave);
-        window.location.href = "/";
+        if (data.csrf_token) {
+          localStorage.setItem("csrf_token", data.csrf_token);
+        }
+
+        window.location.href = data.must_change_password ? "/account" : "/";
       },
-      onError: () => {
-        setLoginError("Błędny login lub hasło.");
+      onError: (err: unknown) => {
+        const status = (err as { response?: { status?: number } })?.response
+          ?.status;
+
+        if (status === 429) {
+          setLoginError(
+            "Za dużo prób logowania. Odczekaj chwilę i spróbuj ponownie.",
+          );
+          return;
+        }
+
+        setLoginError(
+          step === "totp"
+            ? "Nie udało się zalogować. Sprawdź kod — jest ważny przez około 30 sekund."
+            : "Błędny login lub hasło.",
+        );
       },
     });
   };

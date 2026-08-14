@@ -1190,7 +1190,13 @@ export interface paths {
   "/devices/{id}/static-ip": {
     /**
      * Requires `device:static_ip:manage`. Creates a DHCP reservation. The address must lie inside the
-     * device's current VLAN subnet and must not already be leased to another device.
+     * device's current VLAN subnet and must not already be leased or reserved to another device.
+     *
+     * The reservation is intent: dnsmasq hands the address over at the device's next lease, so
+     * `ip_address` keeps reporting the address in use and `reserved_ip` reports the one promised. The
+     * reconciler shortens the wait by deauthenticating the station once the reservation has reached
+     * dnsmasq — the device reassociates within seconds and requests the reserved address — after which
+     * `is_static_ip` becomes true. A device that is switched off simply takes it up when it returns.
      */
     put: {
       parameters: {
@@ -1230,7 +1236,11 @@ export interface paths {
         };
       };
     };
-    /** Requires `device:static_ip:manage`. The device returns to dynamic allocation from its VLAN's pool. */
+    /**
+     * Requires `device:static_ip:manage`. The device returns to dynamic allocation from its VLAN's pool
+     * at its next lease; the address it currently holds is left alone. Reclassifying a device drops its
+     * reservation too, since the address belongs to the segment being left.
+     */
     delete: {
       parameters: {
         path: {
@@ -1251,6 +1261,10 @@ export interface paths {
         };
         /** device_not_found */
         404: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** no_reservation */
+        409: {
           schema: definitions["ErrorResponse"];
         };
       };
@@ -2251,6 +2265,11 @@ export interface paths {
      * `observation` is the loop behind every device's `last_seen` and `ip_address`. If `running` is false
      * or `error` is set, the API's picture of which devices are connected is stale — the appliance keeps
      * routing and filtering regardless.
+     *
+     * `detection` is the loop behind every alert, plus what the IDS reports about itself. Read
+     * `rules_loaded` before trusting an empty alert list: an engine wired into the netfilter queue with
+     * zero rules inspects every packet against nothing and stays silent, which is indistinguishable
+     * from a quiet network. The `suricata:rules` preflight check reports the same thing as a verdict.
      */
     get: {
       responses: {
@@ -2725,11 +2744,76 @@ export interface paths {
       };
     };
   };
+  "/wifi/guest/clients": {
+    /**
+     * Requires `wifi:read`. Visitors on the guest SSID, read live from dnsmasq's leases.
+     *
+     * These are deliberately not devices and never will be. The guest SSID carries no per-device PSK,
+     * so there is no credential to anchor an identity to, and a row keyed on a MAC is exactly the
+     * identity MAC randomisation defeats. Nothing here can be classified, enrolled or given a rule;
+     * the whole segment is governed by the `guest_internet_only` profile.
+     */
+    get: {
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["ListResponse-security-hub_internal_dto_GuestClient"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
+  "/wifi/guest/credential": {
+    /**
+     * Requires `wifi:guest_secret:read` — held by operator and above, deliberately not by viewer:
+     * revealing this hands out network access.
+     *
+     * The guest passphrase is shared and printed, not per-device, and it is read out of hostapd's own
+     * config. There is no rotation endpoint and there should not be one: the config belongs to the image,
+     * and reloading it restarts a hostapd process that also serves the per-device-PSK BSS, dropping every
+     * enrolled device off the network.
+     *
+     * Each reveal appends a `wifi.guest_credential_read` audit entry naming the actor. The passphrase
+     * appears in this response only — never in a log line and never in the audit details.
+     */
+    get: {
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["GuestCredential"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** guest_secret_unreadable */
+        404: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
   "/wifi/settings": {
     /**
      * Requires `wifi:read`. There is exactly one SSID by design: an SSID per VLAN would break the
      * reclassification flow, since a device would have to be reconfigured to move between segments. Segment
      * assignment comes from the device's PSK instead.
+     *
+     * `radio` reports what hostapd is actually configured with, which this API reads and never writes —
+     * hostapd has no `conf.d` and its config belongs to the image. When `radio.in_sync` is false,
+     * `radio.divergent_fields` names what the record gets wrong; the SSID matters most, because device
+     * enrolment tells the installer to join the *recorded* one.
      */
     get: {
       responses: {
@@ -2742,40 +2826,6 @@ export interface paths {
           schema: definitions["ErrorResponse"];
         };
         /** permission_denied */
-        403: {
-          schema: definitions["ErrorResponse"];
-        };
-        /** wifi_not_configured */
-        404: {
-          schema: definitions["ErrorResponse"];
-        };
-      };
-    };
-    /**
-     * Requires `wifi:update`. Omitting a field leaves it alone. Combinations that would weaken the radio
-     * are rejected — notably requiring protected management frames while disabling them.
-     */
-    patch: {
-      parameters: {
-        body: {
-          /** Fields to change */
-          request: definitions["UpdateWiFiRequest"];
-        };
-      };
-      responses: {
-        /** OK */
-        200: {
-          schema: definitions["WiFiSettings"];
-        };
-        /** invalid_wifi_settings or validation_failed */
-        400: {
-          schema: definitions["ErrorResponse"];
-        };
-        /** unauthenticated */
-        401: {
-          schema: definitions["ErrorResponse"];
-        };
-        /** permission_denied or csrf_token_invalid */
         403: {
           schema: definitions["ErrorResponse"];
         };
@@ -2926,6 +2976,22 @@ export interface definitions {
     path?: string;
     size_bytes?: number;
   };
+  Detection: {
+    alerts_recorded?: number;
+    at?: string;
+    duplicates?: number;
+    error?: string;
+    events_read?: number;
+    ignored?: number;
+    packets_captured?: number;
+    packets_dropped?: number;
+    quarantined?: number;
+    rules_failed?: number;
+    rules_loaded?: number;
+    running?: boolean;
+    stats_available?: boolean;
+    unattributed?: number;
+  };
   DeviationsResponse: {
     added?: definitions["FirewallRule"][];
     modified?: definitions["ModifiedRule"][];
@@ -2952,6 +3018,7 @@ export interface definitions {
     model_name?: string;
     notes?: string;
     onboarding_state?: string;
+    reserved_ip?: string;
     vendor_name?: string;
     vlan_id?: number;
     vlan_name?: string;
@@ -2974,10 +3041,6 @@ export interface definitions {
   EnrollDeviceRequest: {
     display_name: string;
     mac?: string;
-    /**
-     * @description NeedsInternetForSetup grants a timed window in quarantine when the device first connects,
-     * for hardware that cannot complete its own pairing without reaching a vendor cloud.
-     */
     needs_internet_for_setup?: boolean;
     notes?: string;
     psk?: string;
@@ -3032,6 +3095,22 @@ export interface definitions {
     error?: string;
     /** @description applied|pending|failed */
     status?: string;
+  };
+  GuestClient: {
+    hostname?: string;
+    ip_address?: string;
+    is_randomized_mac?: boolean;
+    is_static?: boolean;
+    lease_end?: string;
+    lease_start?: string;
+    mac?: string;
+    vendor?: string;
+  };
+  GuestCredential: {
+    config_path?: string;
+    passphrase?: string;
+    ssid?: string;
+    wifi_qr_payload?: string;
   };
   HostInfo: {
     /** @description RFC3339 UTC */
@@ -3109,6 +3188,12 @@ export interface definitions {
   };
   "ListResponse-security-hub_internal_dto_Fingerprint": {
     data?: definitions["Fingerprint"][];
+    limit?: number;
+    offset?: number;
+    total?: number;
+  };
+  "ListResponse-security-hub_internal_dto_GuestClient": {
+    data?: definitions["GuestClient"][];
     limit?: number;
     offset?: number;
     total?: number;
@@ -3266,10 +3351,6 @@ export interface definitions {
     generation: number;
   };
   RotatePSKRequest: {
-    /**
-     * @description NeedsInternetForSetup re-arms the startup window: a factory-reset device being re-paired
-     * has the same first-run need as a new one.
-     */
     needs_internet_for_setup?: boolean;
     psk?: string;
   };
@@ -3319,6 +3400,7 @@ export interface definitions {
   SystemStatus: {
     counts?: definitions["Counts"];
     database?: definitions["DatabaseStatus"];
+    detection?: definitions["Detection"];
     firewall?: definitions["FirewallStatus"];
     host?: definitions["HostInfo"];
     observation?: definitions["Observation"];
@@ -3360,18 +3442,6 @@ export interface definitions {
     display_name?: string;
     policy_profile_id?: number;
   };
-  UpdateWiFiRequest: {
-    /** @enum {string} */
-    band?: "2_4" | "5" | "dual";
-    channel?: number;
-    device_psk_length?: number;
-    min_psk_entropy?: number;
-    pmf_enabled?: boolean;
-    pmf_required?: boolean;
-    /** @enum {string} */
-    security_mode?: "wpa2" | "wpa3" | "wpa2_wpa3_mixed";
-    ssid?: string;
-  };
   User: {
     created_at?: string;
     email?: string;
@@ -3404,13 +3474,30 @@ export interface definitions {
     reason?: string;
     valid?: boolean;
   };
+  WiFiRadio: {
+    band?: string;
+    channel?: number;
+    config_path?: string;
+    divergent_fields?: string[];
+    in_sync?: boolean;
+    interface?: string;
+    pmf_enabled?: boolean;
+    pmf_required?: boolean;
+    readable?: boolean;
+    security_mode?: string;
+    ssid?: string;
+    unreadable?: string;
+  };
   WiFiSettings: {
     band?: string;
     channel?: number;
     device_psk_length?: number;
+    guest_radio?: definitions["WiFiRadio"];
     min_psk_entropy?: number;
     pmf_enabled?: boolean;
     pmf_required?: boolean;
+    radio?: definitions["WiFiRadio"];
+    read_only_fields?: string[];
     security_mode?: string;
     ssid?: string;
     updated_at?: string;

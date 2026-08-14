@@ -8,6 +8,9 @@ type CreateFirewallRuleRequest = definitions["CreateFirewallRuleRequest"];
 type VLAN = definitions["VLAN"];
 type ListResponseVLAN =
   definitions["ListResponse-security-hub_internal_dto_VLAN"];
+type Device = definitions["Device"];
+type ListResponseDevice =
+  definitions["ListResponse-security-hub_internal_dto_Device"];
 
 type Props = {
   onClose: () => void;
@@ -50,7 +53,23 @@ export default function FirewallRuleDialog({ onClose }: Props) {
     staleTime: 300000,
   });
 
+  const { data: deviceData, isLoading: devicesLoading } = useQuery({
+    queryKey: ["devices", "rule-picker"],
+    queryFn: async () => {
+      const res = await api.get<ListResponseDevice>("/devices?limit=500");
+      return res.data;
+    },
+    staleTime: 60000,
+    enabled: scope === "device",
+  });
+
   const vlans: VLAN[] = vlanData?.data ?? [];
+  const devices: Device[] = [...(deviceData?.data ?? [])].sort((a, b) =>
+    (a.display_name || a.model_name || "").localeCompare(
+      b.display_name || b.model_name || "",
+      "pl",
+    ),
+  );
 
   const create = useMutation({
     mutationFn: async (payload: CreateFirewallRuleRequest) => {
@@ -98,8 +117,8 @@ export default function FirewallRuleDialog({ onClose }: Props) {
     if (scope === "vlan" && !vlanId) {
       next.vlan_id = "Wskaż segment, którego dotyczy reguła.";
     }
-    if (scope === "device" && !deviceId.trim()) {
-      next.device_id = "Podaj identyfikator urządzenia.";
+    if (scope === "device" && !deviceId) {
+      next.device_id = "Wskaż urządzenie, którego dotyczy reguła.";
     }
     if (!dstDomain.trim() && !dstIp.trim() && !dstZone.trim()) {
       next.destination =
@@ -238,14 +257,27 @@ export default function FirewallRuleDialog({ onClose }: Props) {
           ) : (
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-400">
-                Identyfikator urządzenia
+                Urządzenie
               </label>
-              <input
+              <select
                 value={deviceId}
                 onChange={(e) => setDeviceId(e.target.value)}
-                placeholder="UUID z adresu karty urządzenia"
-                className={`${inputClass(fieldErrors.device_id)} font-mono`}
-              />
+                disabled={devicesLoading}
+                className={inputClass(fieldErrors.device_id)}
+              >
+                <option value="">
+                  {devicesLoading ? "Pobieram urządzenia..." : "— wybierz —"}
+                </option>
+                {devices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.display_name ||
+                      device.model_name ||
+                      device.macs?.[0]?.mac ||
+                      device.id}
+                    {device.vlan_id ? ` · VLAN ${device.vlan_id}` : ""}
+                  </option>
+                ))}
+              </select>
               {fieldErrors.device_id && (
                 <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
                   {fieldErrors.device_id}

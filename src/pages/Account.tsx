@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import Sidebar from "../components/Sidebar";
+import TwoFactorSection from "../components/TwoFactorSection";
 import type { definitions } from "../api/types";
 
 export default function Account() {
@@ -325,6 +326,8 @@ export default function Account() {
                 </button>
               </form>
             </div>
+
+            <TwoFactorSection enabled={!!sessionData?.mfa_enabled} />
           </div>
         </main>
       </div>

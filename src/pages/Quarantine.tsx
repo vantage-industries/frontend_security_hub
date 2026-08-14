@@ -22,6 +22,19 @@ type VLAN = definitions["VLAN"];
 type ListResponseVLAN =
   definitions["ListResponse-security-hub_internal_dto_VLAN"];
 
+const reasonLabels: Record<string, string> = {
+  user: "Decyzja administratora",
+  ids_quarantine: "Wykrycie IDS",
+  ids: "Wykrycie IDS",
+  onboarding: "Oczekuje na przydział",
+  system: "Automat systemowy",
+};
+
+function reasonLabel(raw?: string): string {
+  if (!raw) return "Automat systemowy";
+  return reasonLabels[raw.toLowerCase()] || raw.replace(/_/g, " ");
+}
+
 export default function Quarantine() {
   const queryClient = useQueryClient();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -298,7 +311,7 @@ export default function Quarantine() {
                             Brak urządzeń w kwarantannie
                           </p>
                           <p className="text-sm mt-1">
-                            Wszystko jest w porządku.
+                            Żadne urządzenie nie jest odcięte od sieci.
                           </p>
                         </td>
                       </tr>
@@ -329,8 +342,8 @@ export default function Quarantine() {
                               </div>
                             </td>
                             <td className="px-6 py-3">
-                              <span className="px-2.5 py-1 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 rounded text-[11px] uppercase font-bold">
-                                Blokada: {dev.classified_by || "System IDS"}
+                              <span className="px-2.5 py-1 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 rounded text-[11px] font-bold">
+                                {reasonLabel(dev.classified_by)}
                               </span>
                             </td>
                             <td className="px-6 py-3 text-xs text-gray-500 font-mono">

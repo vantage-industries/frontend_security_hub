@@ -9,6 +9,8 @@ import {
   Ban,
   ShieldCheck,
   Globe,
+  ChevronLeft,
+  ChevronRight,
   RefreshCw,
 } from "lucide-react";
 import { api } from "../api/client";
@@ -22,6 +24,8 @@ type ListResponseDNSDomain =
 
 type Filter = "all" | "new" | "blocked";
 
+const pageSize = 50;
+
 export default function DnsDomains() {
   const queryClient = useQueryClient();
   const { can } = useSession();
@@ -29,12 +33,16 @@ export default function DnsDomains() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["dns-domains", filter],
+    queryKey: ["dns-domains", filter, page],
     queryFn: async () => {
-      const params = new URLSearchParams({ limit: "200" });
+      const params = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String(page * pageSize),
+      });
       if (filter === "new") params.set("is_new", "true");
       if (filter === "blocked") params.set("is_blocked", "true");
       const res = await api.get<ListResponseDNSDomain>(
@@ -42,7 +50,13 @@ export default function DnsDomains() {
       );
       return res.data;
     },
+    placeholderData: (previous) => previous,
   });
+
+  const total = data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const rangeFrom = total === 0 ? 0 : page * pageSize + 1;
+  const rangeTo = Math.min((page + 1) * pageSize, total);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["dns-domains"] });
@@ -181,7 +195,10 @@ export default function DnsDomains() {
               ).map(([value, label]) => (
                 <button
                   key={value}
-                  onClick={() => setFilter(value)}
+                  onClick={() => {
+                    setFilter(value);
+                    setPage(0);
+                  }}
                   className={`rounded px-3 py-1.5 text-xs font-bold transition-colors ${
                     filter === value
                       ? "bg-blue-600 text-white"
@@ -325,6 +342,39 @@ export default function DnsDomains() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-800">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {total === 0
+                  ? "Brak wyników"
+                  : `${rangeFrom}–${rangeTo} z ${total}`}
+                {search && (
+                  <span className="ml-2 text-gray-400">
+                    (wyszukiwarka filtruje tylko bieżącą stronę)
+                  </span>
+                )}
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0 || isFetching}
+                  className="flex items-center gap-1 rounded px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Poprzednia
+                </button>
+                <span className="font-mono text-xs text-gray-500">
+                  {page + 1} / {pageCount}
+                </span>
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page + 1 >= pageCount || isFetching}
+                  className="flex items-center gap-1 rounded px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Następna <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         </main>

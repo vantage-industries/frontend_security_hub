@@ -22,6 +22,7 @@ const Diagnostics = lazy(() => import("./pages/Diagnostics"));
 const Sessions = lazy(() => import("./pages/Sessions"));
 const DnsDomains = lazy(() => import("./pages/DnsDomains"));
 const Audit = lazy(() => import("./pages/Audit"));
+const Alerts = lazy(() => import("./pages/Alerts"));
 
 type SetupStatusResponse = definitions["SetupStatusResponse"];
 
@@ -278,6 +279,19 @@ export default function App() {
             element={
               isAuthenticated && !setupRequired ? (
                 <Audit />
+              ) : (
+                <Navigate
+                  to={setupRequired ? "/bootstrap" : "/login"}
+                  replace
+                />
+              )
+            }
+          />
+          <Route
+            path="/alerts"
+            element={
+              isAuthenticated && !setupRequired ? (
+                <Alerts />
               ) : (
                 <Navigate
                   to={setupRequired ? "/bootstrap" : "/login"}

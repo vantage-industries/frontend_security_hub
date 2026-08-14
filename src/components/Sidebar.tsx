@@ -8,6 +8,7 @@ import {
   Home,
   Inbox,
   ShieldBan,
+  Siren,
   Wifi,
   Network,
   ShieldCheck,
@@ -38,6 +39,7 @@ type NavItem = {
 const mainNav: NavItem[] = [
   { to: "/", label: "Przegląd", icon: Home },
   { to: "/onboarding", label: "Nowe urządzenia", icon: Inbox },
+  { to: "/alerts", label: "Alerty", icon: Siren },
   { to: "/quarantine", label: "Kwarantanna", icon: ShieldBan },
   { to: "/devices", label: "Urządzenia", icon: Wifi },
   { to: "/vlans", label: "Segmenty sieci", icon: Network },

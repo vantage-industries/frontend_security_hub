@@ -189,8 +189,9 @@ export default function Dashboard() {
               </div>
             </Link>
 
-            <div
-              className={`p-4 rounded shadow-sm flex flex-col justify-between ${status?.counts?.unacknowledged_alerts ? "bg-[#fb8c00]" : "bg-[#43a047]"}`}
+            <Link
+              to="/alerts"
+              className={`p-4 rounded shadow-sm flex flex-col justify-between hover:opacity-90 transition-opacity cursor-pointer ${status?.counts?.unacknowledged_alerts ? "bg-[#fb8c00]" : "bg-[#43a047]"}`}
             >
               <div className="flex items-center justify-between mb-2 opacity-90">
                 <span className="text-sm font-medium uppercase tracking-wider">
@@ -203,7 +204,7 @@ export default function Dashboard() {
                   ? "..."
                   : status?.counts?.unacknowledged_alerts || 0}
               </div>
-            </div>
+            </Link>
 
             <div className="bg-[#8e24aa] p-4 rounded shadow-sm flex flex-col justify-between">
               <div className="flex items-center justify-between mb-2 opacity-90">
@@ -260,11 +261,26 @@ export default function Dashboard() {
                         {quarantined} w kwarantannie
                       </Link>
                     )}
+                    {(status?.counts?.unacknowledged_alerts || 0) > 0 && (
+                      <Link
+                        to="/alerts"
+                        className="text-orange-600 hover:underline"
+                      >
+                        {status?.counts?.unacknowledged_alerts} alertów bez
+                        reakcji
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>
               <Link
-                to="/quarantine"
+                to={
+                  (pendingDevices?.total || 0) > 0
+                    ? "/onboarding"
+                    : quarantined > 0
+                      ? "/quarantine"
+                      : "/alerts"
+                }
                 className="bg-orange-50 hover:bg-orange-100 text-orange-700 px-4 py-1.5 rounded text-sm font-medium transition-colors dark:bg-orange-900/30 dark:text-orange-400"
               >
                 Rozwiąż
@@ -316,10 +332,10 @@ export default function Dashboard() {
                   Zdarzenia bezpieczeństwa
                 </h2>
                 <Link
-                  to="/quarantine"
+                  to="/alerts"
                   className="text-xs text-blue-600 hover:underline dark:text-blue-400"
                 >
-                  Kwarantanna
+                  Zobacz wszystkie
                 </Link>
               </div>
               <div className="overflow-x-auto">

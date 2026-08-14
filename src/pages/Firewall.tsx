@@ -11,6 +11,7 @@ import {
   PencilLine,
   MinusCircle,
   RotateCcw,
+  Trash2,
   FileCode,
   Copy,
   Check,
@@ -106,6 +107,26 @@ export default function Firewall() {
     },
     onError: (err: unknown) =>
       setError(errorMessage(err, "Nie udało się zastosować reguł.")),
+  });
+
+  const deleteRuleMutation = useMutation({
+    mutationFn: async (ruleId: number) => {
+      await api.delete(`/firewall/rules/${ruleId}`);
+    },
+    onSuccess: () => {
+      setError(null);
+      invalidate();
+    },
+    onError: (err: unknown) => {
+      const e = err as {
+        response?: { status?: number; data?: { error?: { message?: string } } };
+      };
+      setError(
+        e?.response?.status === 409
+          ? "Tej reguły nie da się usunąć — pochodzi z profilu polityk. Zmień profil albo odepnij go od segmentu."
+          : e?.response?.data?.error?.message || "Nie udało się usunąć reguły.",
+      );
+    },
   });
 
   const rollbackMutation = useMutation({
@@ -338,10 +359,35 @@ export default function Firewall() {
                       {added.map((rule) => (
                         <li
                           key={rule.id}
-                          className="rounded bg-gray-50 px-3 py-2 font-mono text-[11px] text-gray-700 dark:bg-gray-950 dark:text-gray-300"
+                          className="flex items-center justify-between gap-3 rounded bg-gray-50 px-3 py-2 dark:bg-gray-950"
                         >
-                          {ruleSummary(rule)}
-                          {rule.origin ? ` · źródło: ${rule.origin}` : ""}
+                          <span className="font-mono text-[11px] text-gray-700 dark:text-gray-300">
+                            {ruleSummary(rule)}
+                            {rule.origin ? ` · źródło: ${rule.origin}` : ""}
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `Usunąć regułę „${ruleSummary(rule)}"? Zacznie to obowiązywać po zastosowaniu reguł.`,
+                                )
+                              ) {
+                                deleteRuleMutation.mutate(rule.id as number);
+                              }
+                            }}
+                            disabled={
+                              !can("firewall:rule:write") ||
+                              deleteRuleMutation.isPending
+                            }
+                            title={
+                              can("firewall:rule:write")
+                                ? "Usuń regułę"
+                                : "Wymaga uprawnienia firewall:rule:write"
+                            }
+                            className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-900/30"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </li>
                       ))}
                     </ul>

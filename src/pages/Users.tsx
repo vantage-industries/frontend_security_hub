@@ -620,9 +620,21 @@ export default function Users() {
                               </td>
                               <td className="px-6 py-3 text-center">
                                 {user.mfa_enabled ? (
-                                  <ShieldCheck className="w-5 h-5 text-emerald-500 mx-auto" />
+                                  <ShieldCheck
+                                    className="w-5 h-5 text-emerald-500 mx-auto"
+                                    aria-label="Weryfikacja dwuetapowa włączona"
+                                  >
+                                    <title>
+                                      Weryfikacja dwuetapowa włączona
+                                    </title>
+                                  </ShieldCheck>
                                 ) : (
-                                  <ShieldAlert className="w-5 h-5 text-orange-400 mx-auto opacity-50" />
+                                  <ShieldAlert
+                                    className="w-5 h-5 text-orange-400 mx-auto opacity-50"
+                                    aria-label="Konto chronione samym hasłem"
+                                  >
+                                    <title>Konto chronione samym hasłem</title>
+                                  </ShieldAlert>
                                 )}
                               </td>
                               <td className="px-6 py-3 text-xs text-gray-500 font-mono">

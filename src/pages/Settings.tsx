@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Menu,
   X,
@@ -10,7 +10,6 @@ import {
   Power,
   RefreshCw,
   AlertTriangle,
-  CheckCircle2,
   Shield,
 } from "lucide-react";
 import { api } from "../api/client";
@@ -19,26 +18,12 @@ import { useSession } from "../hooks/useSession";
 import type { definitions } from "../api/types";
 
 type WiFiSettings = definitions["WiFiSettings"];
-type UpdateWiFiRequest = definitions["UpdateWiFiRequest"];
 type ReauthRequest = definitions["ReauthRequest"];
 
 export default function Settings() {
-  const queryClient = useQueryClient();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState("wifi");
-
-  const [wifiForm, setWifiForm] = useState<UpdateWiFiRequest>({
-    ssid: "",
-    band: "dual",
-    channel: 0,
-    security_mode: "wpa2_wpa3_mixed",
-    pmf_enabled: true,
-    pmf_required: false,
-    min_psk_entropy: 60,
-  });
-  const [wifiSuccess, setWifiSuccess] = useState("");
-  const [wifiError, setWifiError] = useState("");
 
   const [reauthModalType, setReauthModalType] = useState<
     "reboot" | "factory-reset" | null
@@ -66,41 +51,7 @@ export default function Settings() {
     refetchInterval: false,
   });
 
-  useEffect(() => {
-    if (wifiData) {
-      setWifiForm({
-        ssid: wifiData.ssid || "",
-        band: (wifiData.band as any) || "dual",
-        channel: wifiData.channel || 0,
-        security_mode: (wifiData.security_mode as any) || "wpa2_wpa3_mixed",
-        pmf_enabled: wifiData.pmf_enabled ?? true,
-        pmf_required: wifiData.pmf_required ?? false,
-        min_psk_entropy: wifiData.min_psk_entropy || 60,
-      });
-    }
-  }, [wifiData]);
-
   const { can } = useSession();
-
-  const updateWifiMutation = useMutation({
-    mutationFn: async (payload: UpdateWiFiRequest) => {
-      const res = await api.patch("/wifi/settings", payload);
-      return res.data;
-    },
-    onSuccess: () => {
-      setWifiSuccess("Ustawienia radia zostały zaktualizowane.");
-      setWifiError("");
-      queryClient.invalidateQueries({ queryKey: ["wifi-settings"] });
-      setTimeout(() => setWifiSuccess(""), 4000);
-    },
-    onError: (error: any) => {
-      setWifiError(
-        error?.response?.data?.error?.message ||
-          "Nie udało się zapisać ustawień.",
-      );
-      setWifiSuccess("");
-    },
-  });
 
   const systemActionMutation = useMutation({
     mutationFn: async ({
@@ -141,11 +92,6 @@ export default function Settings() {
     } catch (e) {}
     localStorage.removeItem("csrf_token");
     window.location.href = "/login";
-  };
-
-  const handleWifiSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateWifiMutation.mutate(wifiForm);
   };
 
   const handleSystemAction = (e: React.FormEvent) => {
@@ -325,12 +271,12 @@ export default function Settings() {
               <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6 animate-in fade-in duration-200">
                 <div className="mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
                   <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Radio className="w-5 h-5 text-blue-600 dark:text-blue-400" />{" "}
-                    Ustawienia sieci rozgłaszanej
+                    <Radio className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    Sieć rozgłaszana
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    Konfiguracja głównego SSID oraz standardów zabezpieczeń
-                    radia HostAPD.
+                    Konfiguracja radia należy do obrazu systemu i nie da się jej
+                    zmienić z panelu. Poniżej stan odczytany z urządzenia.
                   </p>
                 </div>
 
@@ -338,199 +284,167 @@ export default function Settings() {
                   <div className="py-8 text-center text-gray-500 font-mono text-sm">
                     Wczytywanie konfiguracji radia...
                   </div>
+                ) : !wifiData ? (
+                  <p className="py-8 text-center text-sm text-gray-500">
+                    Radio nie jest jeszcze skonfigurowane.
+                  </p>
                 ) : (
-                  <form onSubmit={handleWifiSubmit} className="space-y-6">
-                    {wifiError && (
-                      <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-3 rounded flex items-start gap-3">
-                        <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                        <p className="text-xs text-red-700 dark:text-red-400 font-medium">
-                          {wifiError}
+                  <div className="space-y-6">
+                    {wifiData.radio?.in_sync === false && (
+                      <div className="rounded border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                        <p className="flex items-center gap-1.5 font-bold">
+                          <AlertTriangle className="h-4 w-4" />
+                          Zapis w bazie nie zgadza się z konfiguracją radia
                         </p>
-                      </div>
-                    )}
-                    {wifiSuccess && (
-                      <div className="bg-emerald-50 dark:bg-emerald-900/30 border-l-4 border-emerald-500 p-3 rounded flex items-start gap-3">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                        <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">
-                          {wifiSuccess}
+                        <p className="mt-1">
+                          Rozjazd dotyczy:{" "}
+                          <span className="font-mono">
+                            {(wifiData.radio.divergent_fields ?? []).join(
+                              ", ",
+                            ) || "nieznanych pól"}
+                          </span>
+                          .
                         </p>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Nazwa Sieci (SSID)
-                          </label>
-                          <input
-                            required
-                            type="text"
-                            value={wifiForm.ssid}
-                            onChange={(e) =>
-                              setWifiForm({ ...wifiForm, ssid: e.target.value })
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Częstotliwość (Band)
-                          </label>
-                          <select
-                            value={wifiForm.band}
-                            onChange={(e) =>
-                              setWifiForm({
-                                ...wifiForm,
-                                band: e.target.value as any,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer"
-                          >
-                            <option value="2_4">2.4 GHz</option>
-                            <option value="5">5 GHz</option>
-                            <option value="dual">
-                              Dual Band (2.4 + 5 GHz)
-                            </option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Kanał (Channel)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={wifiForm.channel}
-                            onChange={(e) =>
-                              setWifiForm({
-                                ...wifiForm,
-                                channel: parseInt(e.target.value, 10) || 0,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Wartość 0 oznacza automatyczny wybór (ACS).
+                        {(wifiData.radio.divergent_fields ?? []).includes(
+                          "ssid",
+                        ) && (
+                          <p className="mt-2 font-semibold">
+                            Rozjeżdża się SSID — to poważne. Przy dodawaniu
+                            urządzenia panel podaje zapisaną nazwę sieci, więc
+                            kod QR poprowadzi do sieci, której nie ma.
                           </p>
-                        </div>
+                        )}
                       </div>
+                    )}
 
-                      <div className="space-y-4">
+                    {wifiData.radio?.readable === false && (
+                      <p className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
+                        Nie udało się odczytać konfiguracji hostapd
+                        {wifiData.radio.unreadable
+                          ? `: ${wifiData.radio.unreadable}`
+                          : "."}
+                      </p>
+                    )}
+
+                    <div>
+                      <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        Sieć główna
+                      </h3>
+                      <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Tryb Zabezpieczeń
-                          </label>
-                          <select
-                            value={wifiForm.security_mode}
-                            onChange={(e) =>
-                              setWifiForm({
-                                ...wifiForm,
-                                security_mode: e.target.value as any,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer"
-                          >
-                            <option value="wpa2">
-                              Tylko WPA2 (Starsze urządzenia)
-                            </option>
-                            <option value="wpa2_wpa3_mixed">
-                              WPA2 / WPA3 Mixed (Zalecane)
-                            </option>
-                            <option value="wpa3">
-                              Tylko WPA3 (Wysokie bezpieczeństwo)
-                            </option>
-                          </select>
+                          <dt className="text-xs text-gray-500">Nazwa sieci</dt>
+                          <dd className="font-mono text-gray-800 dark:text-gray-200">
+                            {wifiData.radio?.ssid || wifiData.ssid || "-"}
+                          </dd>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Min. Entropia PSK (Bit)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={wifiForm.min_psk_entropy}
-                            onChange={(e) =>
-                              setWifiForm({
-                                ...wifiForm,
-                                min_psk_entropy:
-                                  parseInt(e.target.value, 10) || 0,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#1a1d21] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                          />
+                          <dt className="text-xs text-gray-500">Pasmo</dt>
+                          <dd className="font-mono text-gray-800 dark:text-gray-200">
+                            {wifiData.radio?.band || wifiData.band || "-"}
+                          </dd>
                         </div>
-                        <div className="pt-2">
-                          <label className="flex items-center gap-3 mb-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={wifiForm.pmf_enabled}
-                              onChange={(e) =>
-                                setWifiForm({
-                                  ...wifiForm,
-                                  pmf_enabled: e.target.checked,
-                                })
-                              }
-                              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <div>
-                              <span className="block text-sm font-bold text-gray-900 dark:text-white">
-                                PMF (Protected Management Frames)
-                              </span>
-                              <span className="block text-xs text-gray-500">
-                                Zabezpiecza przed atakami deautentykacji.
-                              </span>
-                            </div>
-                          </label>
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={wifiForm.pmf_required}
-                              disabled={!wifiForm.pmf_enabled}
-                              onChange={(e) =>
-                                setWifiForm({
-                                  ...wifiForm,
-                                  pmf_required: e.target.checked,
-                                })
-                              }
-                              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
-                            />
-                            <div
-                              className={
-                                !wifiForm.pmf_enabled ? "opacity-50" : ""
-                              }
-                            >
-                              <span className="block text-sm font-bold text-gray-900 dark:text-white">
-                                Wymagaj PMF
-                              </span>
-                              <span className="block text-xs text-gray-500">
-                                Urządzenia bez obsługi PMF nie połączą się.
-                              </span>
-                            </div>
-                          </label>
+                        <div>
+                          <dt className="text-xs text-gray-500">Kanał</dt>
+                          <dd className="font-mono text-gray-800 dark:text-gray-200">
+                            {wifiData.radio?.channel ||
+                              wifiData.channel ||
+                              "auto"}
+                          </dd>
                         </div>
-                      </div>
+                        <div>
+                          <dt className="text-xs text-gray-500">
+                            Zabezpieczenia
+                          </dt>
+                          <dd className="font-mono text-gray-800 dark:text-gray-200">
+                            {wifiData.radio?.security_mode ||
+                              wifiData.security_mode ||
+                              "-"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-gray-500">
+                            Ochrona ramek (PMF)
+                          </dt>
+                          <dd className="font-mono text-gray-800 dark:text-gray-200">
+                            {(wifiData.radio?.pmf_required ??
+                            wifiData.pmf_required)
+                              ? "wymagana"
+                              : (wifiData.radio?.pmf_enabled ??
+                                  wifiData.pmf_enabled)
+                                ? "włączona"
+                                : "wyłączona"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-gray-500">Interfejs</dt>
+                          <dd className="font-mono text-gray-800 dark:text-gray-200">
+                            {wifiData.radio?.interface || "-"}
+                          </dd>
+                        </div>
+                      </dl>
                     </div>
 
-                    <div className="pt-4 border-t border-gray-200 dark:border-gray-800 flex justify-end">
-                      <button
-                        type="submit"
-                        title={
-                          can("wifi:update")
-                            ? undefined
-                            : "Wymaga uprawnienia wifi:update"
-                        }
-                        disabled={
-                          updateWifiMutation.isPending || !can("wifi:update")
-                        }
-                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {updateWifiMutation.isPending
-                          ? "Zapisywanie..."
-                          : "Zapisz i Zastosuj"}
-                      </button>
+                    {wifiData.guest_radio && (
+                      <div>
+                        <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          Sieć dla gości
+                        </h3>
+                        <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                          <div>
+                            <dt className="text-xs text-gray-500">
+                              Nazwa sieci
+                            </dt>
+                            <dd className="font-mono text-gray-800 dark:text-gray-200">
+                              {wifiData.guest_radio.ssid || "-"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-gray-500">Pasmo</dt>
+                            <dd className="font-mono text-gray-800 dark:text-gray-200">
+                              {wifiData.guest_radio.band || "-"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-gray-500">Interfejs</dt>
+                            <dd className="font-mono text-gray-800 dark:text-gray-200">
+                              {wifiData.guest_radio.interface || "-"}
+                            </dd>
+                          </div>
+                        </dl>
+                      </div>
+                    )}
+
+                    <div>
+                      <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        Klucze urządzeń
+                      </h3>
+                      <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                        <div>
+                          <dt className="text-xs text-gray-500">
+                            Długość generowanego klucza
+                          </dt>
+                          <dd className="font-mono text-gray-800 dark:text-gray-200">
+                            {wifiData.device_psk_length || "-"} znaków
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-gray-500">
+                            Minimalna entropia
+                          </dt>
+                          <dd className="font-mono text-gray-800 dark:text-gray-200">
+                            {wifiData.min_psk_entropy || "-"} bitów
+                          </dd>
+                        </div>
+                      </dl>
                     </div>
-                  </form>
+
+                    {wifiData.updated_at && (
+                      <p className="font-mono text-[11px] text-gray-400">
+                        Zapis zaktualizowano{" "}
+                        {new Date(wifiData.updated_at).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             )}
