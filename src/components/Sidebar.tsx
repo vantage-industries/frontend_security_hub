@@ -21,6 +21,7 @@ import {
   Stethoscope,
   MonitorSmartphone,
   ScrollText,
+  Bug,
 } from "lucide-react";
 
 type ListResponseDevice =
@@ -41,6 +42,7 @@ const mainNav: NavItem[] = [
   { to: "/", label: "Przegląd", icon: Home },
   { to: "/onboarding", label: "Nowe urządzenia", icon: Inbox },
   { to: "/alerts", label: "Alerty", icon: Siren },
+  { to: "/cve", label: "CVE", icon: Bug },
   { to: "/quarantine", label: "Kwarantanna", icon: ShieldBan },
   { to: "/devices", label: "Urządzenia", icon: Wifi },
   { to: "/guest-wifi", label: "Wi-Fi dla Gości", icon: QrCode },

@@ -561,6 +561,232 @@ export interface paths {
       };
     };
   };
+  "/cve/findings": {
+    /**
+     * Requires `cve:read`. Highest CVSS first, across every device.
+     *
+     * Every finding is a keyword match on the device's vendor and model against a public catalogue. There is
+     * no firmware version anywhere in the match, so `match_basis` and `matched_on` state exactly what was
+     * compared: a finding is "this hardware appears in this advisory", not "this device is exploitable".
+     * Findings an operator has judged inapplicable carry `dismissed: true` and are excluded by default.
+     *
+     * An empty list is not evidence of a healthy fleet. Read GET /cve/status first: with no catalogue
+     * configured or reachable, nothing has been checked at all.
+     */
+    get: {
+      parameters: {
+        query: {
+          /** Filter by device UUID */
+          device_id?: string;
+          /** Filter by severity, derived from the CVSS base score */
+          severity?: "info" | "low" | "medium" | "high" | "critical";
+          /** Only findings scoring at or above this CVSS base score */
+          min_cvss?: number;
+          /** Filter by whether the finding has been acknowledged */
+          acknowledged?: boolean;
+          /** Include dismissed findings (default false: dismissed rows are hidden) */
+          dismissed?: boolean;
+          /** Page size (default 50, max 500) */
+          limit?: number;
+          /** Rows to skip (default 0) */
+          offset?: number;
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["ListResponse-security-hub_internal_dto_CVEFinding"];
+        };
+        /** invalid_severity or invalid_request */
+        400: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
+  "/cve/findings/{id}": {
+    /** Requires `cve:read`. Carries the catalogue's description and reference URLs in full. */
+    get: {
+      parameters: {
+        path: {
+          /** Finding ID */
+          id: number;
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["CVEFinding"];
+        };
+        /** invalid_request */
+        400: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** cve_finding_not_found */
+        404: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
+  "/cve/findings/{id}/acknowledge": {
+    /**
+     * Requires `cve:acknowledge`. Records who reviewed it and when, without claiming the device is not
+     * affected — that is what dismissal says. Acknowledging an already acknowledged finding is a 409, so
+     * two operators working the same queue can tell that someone got there first.
+     */
+    post: {
+      parameters: {
+        path: {
+          /** Finding ID */
+          id: number;
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["MessageResponse"];
+        };
+        /** invalid_request */
+        400: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied or csrf_token_invalid */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** cve_finding_not_found */
+        404: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** already_acknowledged */
+        409: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
+  "/cve/findings/{id}/dismiss": {
+    /**
+     * Requires `cve:dismiss`. Declares that the advisory does not apply to this device — a different
+     * firmware, a different hardware revision, a vendor name that collides with another product's.
+     *
+     * Dismissal is the honest counterpart to a match with no version in it: the catalogue cannot know what
+     * the hardware is running, so some matches are wrong and only the operator can say which. The row is kept
+     * rather than deleted, so the next sweep does not resurrect it as new.
+     */
+    post: {
+      parameters: {
+        path: {
+          /** Finding ID */
+          id: number;
+        };
+        body: {
+          /** Why it does not apply */
+          request?: definitions["DismissCVERequest"];
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["MessageResponse"];
+        };
+        /** invalid_request */
+        400: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied or csrf_token_invalid */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** cve_finding_not_found */
+        404: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+    /** Requires `cve:dismiss`. Puts a dismissed finding back on the queue. */
+    delete: {
+      parameters: {
+        path: {
+          /** Finding ID */
+          id: number;
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["MessageResponse"];
+        };
+        /** invalid_request */
+        400: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied or csrf_token_invalid */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** cve_finding_not_found */
+        404: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
+  "/cve/status": {
+    /**
+     * Requires `cve:read`. Whether a catalogue is configured, whether the last query reached it, the
+     * request budget in force, and the sweep's last pass.
+     *
+     * Read this before trusting an empty findings list. A hub with no WAN uplink, a rejected API key or
+     * `cve.source: none` produces exactly the same empty list as a fleet with nothing wrong with it, and
+     * `reachable` plus `devices_scanned` are what separate the two.
+     */
+    get: {
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["CVEStatus"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
   "/devices": {
     /**
      * Requires `device:read`. Soft-deleted devices are excluded.
@@ -868,6 +1094,93 @@ export interface paths {
         };
         /** vlan_not_deployed or address_pool_exhausted */
         409: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
+  "/devices/{id}/cve-scan": {
+    /**
+     * Requires `cve:scan`. Queries the configured catalogue for the device's vendor and model and records
+     * what came back. Idempotent: a record already on file is refreshed rather than duplicated, and the
+     * operator's own acknowledgement and dismissal survive the rescan.
+     *
+     * This is the appliance's only outbound request, and it is paced to stay inside the catalogue's
+     * published rate budget, so a scan may take a few seconds. A device with neither a vendor nor a model
+     * has nothing to search on and is refused with 409 rather than spending a request on an empty phrase.
+     *
+     * `truncated: true` means the catalogue holds more records than `cve.max_results_per_device` retrieved.
+     */
+    post: {
+      parameters: {
+        path: {
+          /** Device UUID */
+          id: string;
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["CVEScanResponse"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied or csrf_token_invalid */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** device_not_found */
+        404: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** device_not_identifiable or cve_catalog_disabled */
+        409: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** cve_catalog_unreachable */
+        502: {
+          schema: definitions["ErrorResponse"];
+        };
+      };
+    };
+  };
+  "/devices/{id}/cves": {
+    /**
+     * Requires `cve:read`. The findings recorded against this device, and the scan that produced them.
+     *
+     * `scan.never_scanned: true` is not the same answer as an empty `data` array with a successful scan,
+     * and a client must not render them alike: the first means nothing has been checked.
+     */
+    get: {
+      parameters: {
+        path: {
+          /** Device UUID */
+          id: string;
+        };
+        query: {
+          /** Page size (default 50, max 500) */
+          limit?: number;
+          /** Rows to skip (default 0) */
+          offset?: number;
+        };
+      };
+      responses: {
+        /** OK */
+        200: {
+          schema: definitions["DeviceCVEs"];
+        };
+        /** unauthenticated */
+        401: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** permission_denied */
+        403: {
+          schema: definitions["ErrorResponse"];
+        };
+        /** device_not_found */
+        404: {
           schema: definitions["ErrorResponse"];
         };
       };
@@ -2891,6 +3204,87 @@ export interface definitions {
     setup_token: string;
     username: string;
   };
+  CVEFinding: {
+    acknowledged?: boolean;
+    acknowledged_at?: string;
+    acknowledged_by?: string;
+    cve_id?: string;
+    cvss_score?: number;
+    cvss_vector?: string;
+    cvss_version?: string;
+    description?: string;
+    device_id?: string;
+    device_name?: string;
+    dismissed?: boolean;
+    dismissed_reason?: string;
+    first_seen?: string;
+    id?: number;
+    last_modified?: string;
+    last_seen?: string;
+    match_basis?: string;
+    matched_on?: string;
+    published?: string;
+    references?: string[];
+    severity?: string;
+    source?: string;
+  };
+  CVEScan: {
+    completed_at?: string;
+    error?: string;
+    match_basis?: string;
+    matched?: number;
+    never_scanned?: boolean;
+    new_findings?: number;
+    ok?: boolean;
+    query?: string;
+    records_read?: number;
+    source?: string;
+    started_at?: string;
+  };
+  CVEScanResponse: {
+    catalog_total?: number;
+    device_id?: string;
+    findings?: definitions["CVEFinding"][];
+    match_basis?: string;
+    matched?: number;
+    new_findings?: number;
+    query?: string;
+    records_read?: number;
+    source?: string;
+    truncated?: boolean;
+  };
+  CVEStatus: {
+    authorized?: boolean;
+    budget?: string;
+    enabled?: boolean;
+    endpoint?: string;
+    last_error?: string;
+    last_query_at?: string;
+    queries?: number;
+    reachable?: boolean;
+    source?: string;
+    sweep?: definitions["CVESweep"];
+    totals?: definitions["CVETotals"];
+  };
+  CVESweep: {
+    at?: string;
+    due?: number;
+    enabled?: boolean;
+    error?: string;
+    failed?: number;
+    new_findings?: number;
+    running?: boolean;
+    scanned?: number;
+    skipped?: number;
+  };
+  CVETotals: {
+    critical?: number;
+    devices_scanned?: number;
+    findings?: number;
+    high?: number;
+    scan_errors?: number;
+    unreviewed?: number;
+  };
   ChangePasswordRequest: {
     current_password: string;
     new_password: string;
@@ -3023,6 +3417,13 @@ export interface definitions {
     vlan_id?: number;
     vlan_name?: string;
   };
+  DeviceCVEs: {
+    data?: definitions["CVEFinding"][];
+    limit?: number;
+    offset?: number;
+    scan?: definitions["CVEScan"];
+    total?: number;
+  };
   DeviceMAC: {
     first_seen?: string;
     is_randomized?: boolean;
@@ -3037,6 +3438,9 @@ export interface definitions {
     id?: number;
     mac?: string;
     vlan_id?: number;
+  };
+  DismissCVERequest: {
+    reason?: string;
   };
   EnrollDeviceRequest: {
     display_name: string;
@@ -3164,6 +3568,12 @@ export interface definitions {
   };
   "ListResponse-security-hub_internal_dto_AuditEntry": {
     data?: definitions["AuditEntry"][];
+    limit?: number;
+    offset?: number;
+    total?: number;
+  };
+  "ListResponse-security-hub_internal_dto_CVEFinding": {
+    data?: definitions["CVEFinding"][];
     limit?: number;
     offset?: number;
     total?: number;
@@ -3408,6 +3818,7 @@ export interface definitions {
     services?: definitions["ServicesStatus"];
     uptime_seconds?: number;
     version?: string;
+    vulnerability?: definitions["CVEStatus"];
   };
   UpdateDeviceRequest: {
     display_name?: string;
