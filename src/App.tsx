@@ -23,6 +23,7 @@ const Sessions = lazy(() => import("./pages/Sessions"));
 const DnsDomains = lazy(() => import("./pages/DnsDomains"));
 const Audit = lazy(() => import("./pages/Audit"));
 const Alerts = lazy(() => import("./pages/Alerts"));
+const GuestWifi = lazy(() => import("./pages/GuestWifi"));
 
 type SetupStatusResponse = definitions["SetupStatusResponse"];
 
@@ -292,6 +293,19 @@ export default function App() {
             element={
               isAuthenticated && !setupRequired ? (
                 <Alerts />
+              ) : (
+                <Navigate
+                  to={setupRequired ? "/bootstrap" : "/login"}
+                  replace
+                />
+              )
+            }
+          />
+          <Route
+            path="/guest-wifi"
+            element={
+              isAuthenticated && !setupRequired ? (
+                <GuestWifi />
               ) : (
                 <Navigate
                   to={setupRequired ? "/bootstrap" : "/login"}
